@@ -1,11 +1,12 @@
 substitutions:
   name: "UsbSMU"
 
+esp32:
+  board: esp32-s3-devkitc-1  # 8MB flash without PSRAM
+
 esphome:
   name: ducky-iotusbsmu
   name_add_mac_suffix: true
-  platform: esp32
-  board: esp32-s3-devkitc-1  # 8MB flash without PSRAM
   on_boot:
     - number.set:
         id: set_voltage
@@ -65,15 +66,16 @@ globals:
     type: float
     initial_value: '0.5'  # volts
 
-  - id: kVoltageRatio
+  - id: kVoltageRatio  # output volts per ADC volt
     type: float
-    initial_value: '23'  # 22/1, output volts per measured volt
-  - id: kCurrentRatio0
+    initial_value: '21.1'  # 1/(0.0426 (divider) * 1.11 (diffamp))
+  - id: kCurrentRatio0  # output amps per ADC volt, including accounting for resistor value
     type: float
-    initial_value: '2.2727'  # 1/(.022*20), output amps per measured volt, including accounting for resistor value
+    initial_value: '1.02'  # 1/(0.1 (resistor) * 9.82 (diffamp))
   - id: kCurrentRatio1
     type: float
-    initial_value: '0.22727'  # 1/(.22*20)
+    initial_value: '10.2'  # 1/(1 (resistor) * 9.82 (diffamp))
+  # TODO range[2] = 10 ohm
   - id: kVCenter
     type: float
     initial_value: '1.65'  # theoretical
@@ -113,9 +115,7 @@ script:
             if (nextConvVolts == convTargetVolts) {  // turn on output enable when target reached
               id(set_enable_range).execute(false);
             } else {
-              id(output_rgb_r).turn_off();
-              id(output_rgb_g).turn_off();
-              id(output_rgb_b).turn_on();
+              // TODO RGB LEDs
             }
           }
         } else {  // turn off converter
@@ -162,16 +162,12 @@ script:
             return;
           }
           id(control_enable).turn_on();
-          id(output_rgb_r).turn_off();
-          id(output_rgb_g).turn_on();
-          id(output_rgb_b).turn_off();
+          // TODO RGB LEDs
         } else {  // turn off
           id(range0).turn_off();
           id(range1).turn_off();
           id(control_enable).turn_off();
-          id(output_rgb_r).turn_on();
-          id(output_rgb_g).turn_off();
-          id(output_rgb_b).turn_on();
+          // TODO RGB LEDs
         }
 
   - id: update_voltage  # update the voltage
@@ -192,33 +188,15 @@ light:
       inverted: true
 
 output:
-  - id: output_rgb_r
-    platform: gpio
-    pin:
-      pca9554: pca9554a_device
-      number: 6
-      inverted: true
-  - id: output_rgb_g
-    platform: gpio
-    pin:
-      pca9554: pca9554a_device
-      number: 7
-      inverted: true
-  - id: output_rgb_b
-    platform: gpio
-    pin:
-      pca9554: pca9554a_device
-      number: 5
-      inverted: true
   - platform: mcpwm_sync
     id: buck_pwm
-    pin: GPIO42
+    pin: GPIO17
     frequency: 250kHz
     deadtime_rising: 0s  # deadtime generated internally by gate driver
     deadtime_falling: 0s
   - platform: mcpwm_sync
     id: boost_pwm
-    pin: GPIO39  # this controls the HIGH SIDE switch, so the duty is 1-D
+    pin: GPIO18  # this controls the HIGH SIDE switch, so the duty is 1-D
     frequency: 250kHz
     deadtime_rising: 0s  # deadtime generated internally by gate driver
     deadtime_falling: 0s
@@ -236,7 +214,7 @@ output:
   - platform: mcp4728
     id: dac_isrc
     mcp4728_id: dac_control
-    channel: 2
+    channel: 3
 
 switch:
   - platform: template
@@ -253,52 +231,88 @@ switch:
           overlap: false
 
   - platform: gpio
-    id: range0
+    id: vin_ramp
     internal: true
-    name: "${name} Range0"
-    pin: GPIO8
+    name: "${name} Vin Ramp"
+    pin:
+      pca9554: ioe_ctl
+      number: 0
+
   - platform: gpio
-    id: range1
-    internal: true
-    name: "${name} Range1"
-    pin: GPIO18
-  - platform: gpio
-    id: control_enable
+    id: control_enable  # integrator analog switch
     internal: true
     name: "${name} Control Enable"
-    pin: GPIO38
+    pin:
+      pca9554: ioe_ctl
+      number: 4
   - platform: gpio
     id: conv_enable
     internal: true
     name: "${name} Conv Enable"
-    pin: GPIO40
+    pin:
+      pca9554: ioe_ctl
+      number: 2
     inverted: true  # active-low enable
+
+
+  - platform: gpio
+    id: gate_lo
+    internal: true
+    name: "${name} Gate Low"
+    pin:
+      pca9554: ioe_ctl
+      number: 7
+  - platform: gpio
+    id: gate_hi
+    internal: true
+    name: "${name} Gate High"
+    pin:
+      pca9554: ioe_ctl
+      number: 6
+
+  - platform: gpio
+    id: range0
+    internal: true
+    name: "${name} Range0"
+    pin:
+      pca9554: ioe_ui
+      number: 6
+  - platform: gpio
+    id: range1
+    internal: true
+    name: "${name} Range1"
+    pin:
+      pca9554: ioe_ui
+      number: 4
+
   - platform: gpio
     id: fan
     name: "${name} Fan"
-    pin: GPIO11
+    pin: GPIO39
 
 i2c:
-  scl: GPIO1
-  sda: GPIO2
+  scl: GPIO15
+  sda: GPIO7
   frequency: 400kHz
   scan: false
 
 spi:
-  clk_pin: GPIO15
-  mosi_pin: GPIO16
-  miso_pin: GPIO17
+  clk_pin: GPIO9
+  mosi_pin: GPIO10
+  miso_pin: GPIO11
 
 pca9554:
-  - id: pca9554a_device
+  - id: ioe_ctl
     address: 0x38
+  - id: ioe_ui
+    address: 0x3A
 
 fusb302:
   id: usbpd
   target: 15v
 
 mcp3561:
-  cs_pin: GPIO7
+  cs_pin: GPIO3
   id: adc_meas
   osr: 40960  # up to 98304
 
@@ -669,7 +683,8 @@ binary_sensor:
     name: "${name} Conv En Sen"
     internal: true
     pin: 
-      number: GPIO21
+      pca9554: ioe_ctl
+      number: 3
       mode:
         input: true
   - platform: gpio
@@ -677,7 +692,7 @@ binary_sensor:
     name: "${name} Encoder Sw"
     internal: true
     pin: 
-      number: GPIO4
+      number: GPIO40
       inverted: true
       mode:
         input: true
@@ -692,8 +707,8 @@ binary_sensor:
     name: "${name} Dir Sw"
     internal: true
     pin: 
-      pca9554: pca9554a_device
-      number: 0
+      pca9554: ioe_ui
+      number: 1
       inverted: true
       mode:
         input: true
@@ -709,8 +724,8 @@ binary_sensor:
     name: "${name} Dir Up"
     internal: true
     pin: 
-      pca9554: pca9554a_device
-      number: 1
+      pca9554: ioe_ui
+      number: 0
       inverted: true
       mode:
         input: true
@@ -727,8 +742,8 @@ binary_sensor:
     name: "${name} Dir Down"
     internal: true
     pin: 
-      pca9554: pca9554a_device
-      number: 3
+      pca9554: ioe_ui
+      number: 7
       inverted: true
       mode:
         input: true
@@ -744,8 +759,8 @@ binary_sensor:
     name: "${name} Dir Left"
     internal: true
     pin: 
-      pca9554: pca9554a_device
-      number: 4
+      pca9554: ioe_ui
+      number: 2
       inverted: true
       mode:
         input: true
@@ -767,8 +782,8 @@ binary_sensor:
     name: "${name} Dir Right"
     internal: true
     pin: 
-      pca9554: pca9554a_device
-      number: 2
+      pca9554: ioe_ui
+      number: 3
       inverted: true
       mode:
         input: true
@@ -808,8 +823,8 @@ sensor:
     update_interval: 0.01s  # as fast as possible, limited by ADC conversion time
     accuracy_decimals: 4
     mcp3561_id: adc_meas
-    channel: CH2
-    channel_neg: CH0  # pin 0 is vcenter
+    channel: CH0
+    channel_neg: CH2  # pin 2 is vcenter
     filters:
       - lambda: |-
           id(adc_voltage).publish_state(id(meas_voltage).rawValue);
@@ -821,7 +836,7 @@ sensor:
     accuracy_decimals: 5
     mcp3561_id: adc_meas
     channel: CH1
-    channel_neg: CH0  # pin 0 is vcenter
+    channel_neg: CH2  # pin 2 is vcenter
     filters:
       - lambda: |-
           static int8_t lastRange = -1;  // -1=off, 0=range0, 1=...
@@ -938,7 +953,7 @@ sensor:
   #   name: "${name} Int VCenter"
   #   update_interval: 1s
   #   mcp3561_id: adc_meas
-  #   channel: CH0
+  #   channel: CH2
   #   channel_neg: AGND
   #   filters:
   #     - lambda: |-
@@ -947,7 +962,7 @@ sensor:
   - platform: adc
     id: adc_vconv
     name: "${name} Int VConv"
-    pin: GPIO10
+    pin: GPIO8
     accuracy_decimals: 2
     update_interval: 0.25s
     attenuation: auto
@@ -971,13 +986,13 @@ sensor:
     internal: true
     resolution: 2  # so each detent generates one action
     pin_a:
-      number: GPIO5
+      number: GPIO42
       inverted: true
       mode:
         input: true
         pullup: true
     pin_b:
-      number: GPIO6
+      number: GPIO41
       inverted: true
       mode:
         input: true

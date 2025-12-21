@@ -48,7 +48,7 @@ For version 3.1.
   - conv_en=IO2, 6
   - conv_en_sense=IO3, 7
   - off_0=IO4, 9
-- ioe_ui (addr_lsb=2, addr=58)
+- ioe_ui (addr_lsb=2, addr=d58)
   - dir_a=IO0, 4
   - dir_b=IO7, 12
   - dir_c=IO2, 6
@@ -57,5 +57,14 @@ For version 3.1.
   - irange_0=IO6, 11
   - irange_1=IO4, 9
   - irange_2=IO5, 10
-- vusb_sense (addr_lsb=0, addr=64)
-- convin_sense (addr_lsb=4, addr=68)
+- vusb_sense (addr_lsb=0, addr=d64)
+- convin_sense (addr_lsb=4, addr=d68)
+- dac
+  - 0: voltage
+  - 2: votlage_fine
+  - 1: current_sink
+  - 3: current_source
+- adc
+  - 0: meas_voltage
+  - 2: center
+  - 1: meas_current
