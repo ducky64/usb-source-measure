@@ -1,0 +1,1027 @@
+substitutions:
+  name: "UsbSMU"
+
+esphome:
+  name: ducky-iotusbsmu
+  name_add_mac_suffix: true
+  platform: esp32
+  board: esp32-s3-devkitc-1  # 8MB flash without PSRAM
+  on_boot:
+    - number.set:
+        id: set_voltage
+        value: 0
+    - number.set:
+        id: limit_current_min
+        value: -0.1
+    - number.set:
+        id: limit_current_max
+        value: 0.1
+    - number.set:
+        id: buckboost_ratio
+        value: 0.0
+    - switch.turn_on: conv_enable
+    - delay: 0.1s
+    - switch.turn_off: conv_enable
+  on_loop:
+    - script.execute: buckboost_control_loop
+  includes:
+    - smu_display.h
+
+preferences:
+  flash_write_interval: 5s  # so calibration updates save near-immediately
+
+wifi:
+  <<: !include ../wifi_config.yaml
+  ap:
+    ap_timeout: 15s
+
+  reboot_timeout: 0s
+
+captive_portal:
+
+# HASS API
+api:
+  reboot_timeout: 0s
+
+# Allow API
+ota:
+  - platform: esphome
+
+# Print Updates
+logger:
+  level: INFO
+
+# WebServer component, displays some information
+web_server:
+    port: 80
+    local: true
+
+# device constants
+globals:
+  - id: kBuckBoostPwmDeadzone
+    type: float
+    initial_value: '0.03'  # in fractional duty-cycle, maximum / minimum duty cycle
+  - id: kBuckBoostHeadroom
+    type: float
+    initial_value: '0.5'  # volts
+
+  - id: kVoltageRatio
+    type: float
+    initial_value: '23'  # 22/1, output volts per measured volt
+  - id: kCurrentRatio0
+    type: float
+    initial_value: '2.2727'  # 1/(.022*20), output amps per measured volt, including accounting for resistor value
+  - id: kCurrentRatio1
+    type: float
+    initial_value: '0.22727'  # 1/(.22*20)
+  - id: kVCenter
+    type: float
+    initial_value: '1.65'  # theoretical
+  - id: kVref
+    type: float
+    initial_value: '3.3'  # theoretical, 2% tolerance
+
+  - id: cursor
+    type: int
+    initial_value: '0'  # 0 = voltage, 1 = current lim max, 2 = current lim min, 3 = range, 4 = reset integrators
+  - id: cursorDigit
+    type: int[5]
+    initial_value: '{-1, -1, -1, 0, 0}'
+  - id: kCursorDigitLimits
+    type: int[5][2]
+    initial_value: '{{{-1, 1}, {-2, 0}, {-2, 0}, {0, 0}, {0, 0}}}'
+
+script:
+  - id: buckboost_control_loop
+    then:
+    - lambda: |-
+        const float kRampRateVoltsPerS = 25;  // output ramp rate by estimated Vin
+        const int kMaxDeltaMillis = 50;  // maximum ramp per iteration
+
+        static auto lastRun = millis();
+        auto thisRun = millis();
+        auto deltaMillis = min(thisRun - lastRun, (unsigned int)kMaxDeltaMillis);
+        if (id(enable).state) {  // only write the buck-boost if target is enable
+          // set buck-boost to minimum needed + headroom
+          float voltageScalingFactor = max(5.0, (id(fusb_vbus).state - 0.4));  // ratio to output volts = Vin, always expect at least 5
+          // must be higher than measured output to avoid the output back-driving Vconv through the FET body diode; should be hardware diode-gated in a future rev
+          float convTargetVolts = max(id(set_voltage).state, id(meas_voltage_max).state) + id(kBuckBoostHeadroom);
+          float currentConvVolts = id(buckboost_ratio).state * voltageScalingFactor;
+          float nextConvVolts = min(currentConvVolts + kRampRateVoltsPerS * deltaMillis / 1000.f, convTargetVolts);
+          id(buckboost_ratio).make_call().set_value(nextConvVolts / voltageScalingFactor).perform();
+          if (!id(control_enable).state) {  // if not yet turned on
+            if (nextConvVolts == convTargetVolts) {  // turn on output enable when target reached
+              id(set_enable_range).execute(false);
+            } else {
+              id(output_rgb_r).turn_off();
+              id(output_rgb_g).turn_off();
+              id(output_rgb_b).turn_on();
+            }
+          }
+        } else {  // turn off converter
+          id(buckboost_ratio).make_call().set_value(0).perform();
+        }
+      
+  - id: update_current  # update the current, assuming the device is on, or will be turned on
+    then:
+    - lambda: |-
+        float setCurrentFactor = 1, setCurrentOffset = 0;
+        if (id(current_range).state == "3A") {
+          setCurrentFactor = id(kCalSetCurrent0Factor).state * id(kCurrentRatio0);
+          setCurrentOffset = id(kCalSetCurrent0Offset).state;
+        } else if (id(current_range).state == "300mA") {
+          setCurrentFactor = id(kCalSetCurrent1Factor).state * id(kCurrentRatio1);
+          setCurrentOffset = id(kCalSetCurrent1Offset).state;
+        } else {
+          ESP_LOGE("update_current", "Unknown range %s", id(current_range).state);
+        }
+
+        float limitMinVolts = id(kVCenter) - ((id(limit_current_min).state - setCurrentOffset) / setCurrentFactor);
+        id(dac_isink)->write_state(limitMinVolts / id(kVref));
+        float limitMaxVolts = id(kVCenter) - ((id(limit_current_max).state - setCurrentOffset) / setCurrentFactor);
+        id(dac_isrc)->write_state(limitMaxVolts / id(kVref));
+
+  - id: set_enable_range  # sets the overall enable and current ranging IOs, based on the ranging and enable target
+    parameters:
+      overlap: bool  # if true does not turn off other ranges, this allows overlap (though at a much reduced current limit) during the swap
+    then:
+    - lambda: |-
+        if (id(enable).state) {  // turn on, figure out ranging
+          if (id(current_range).state == "3A") {
+            id(range0).turn_on();
+            if (!overlap) {
+              id(range1).turn_off();
+            }
+          } else if (id(current_range).state == "300mA") {
+            id(range1).turn_on();
+            if (!overlap) {
+              id(range0).turn_off();
+            }
+          } else {
+            ESP_LOGE("set_enable_range", "Unknown range %s", id(current_range).state);
+            return;
+          }
+          id(control_enable).turn_on();
+          id(output_rgb_r).turn_off();
+          id(output_rgb_g).turn_on();
+          id(output_rgb_b).turn_off();
+        } else {  // turn off
+          id(range0).turn_off();
+          id(range1).turn_off();
+          id(control_enable).turn_off();
+          id(output_rgb_r).turn_on();
+          id(output_rgb_g).turn_off();
+          id(output_rgb_b).turn_on();
+        }
+
+  - id: update_voltage  # update the voltage
+    then:
+    - lambda: |-
+        float setVoltage = id(set_voltage).state;
+        float correctedX = (setVoltage - id(kCalSetVoltageOffset).state) / id(kCalSetVoltageFactor).state;
+        float targetVolts = id(kVCenter) - (correctedX / id(kVoltageRatio));
+        id(dac_voltage)->write_state(targetVolts / id(kVref));
+
+light:
+  - platform: status_led
+    name: "${name} Dbg"
+    id: debug_led
+    internal: true
+    pin:
+      number: GPIO0
+      inverted: true
+
+output:
+  - id: output_rgb_r
+    platform: gpio
+    pin:
+      pca9554: pca9554a_device
+      number: 6
+      inverted: true
+  - id: output_rgb_g
+    platform: gpio
+    pin:
+      pca9554: pca9554a_device
+      number: 7
+      inverted: true
+  - id: output_rgb_b
+    platform: gpio
+    pin:
+      pca9554: pca9554a_device
+      number: 5
+      inverted: true
+  - platform: mcpwm_sync
+    id: buck_pwm
+    pin: GPIO42
+    frequency: 250kHz
+    deadtime_rising: 0s  # deadtime generated internally by gate driver
+    deadtime_falling: 0s
+  - platform: mcpwm_sync
+    id: boost_pwm
+    pin: GPIO39  # this controls the HIGH SIDE switch, so the duty is 1-D
+    frequency: 250kHz
+    deadtime_rising: 0s  # deadtime generated internally by gate driver
+    deadtime_falling: 0s
+    max_duty: 0.37  # up to 1.5x boost ratio, accounting for 0.95 buck ratio
+    inverted: true
+
+  - platform: mcp4728
+    id: dac_voltage
+    mcp4728_id: dac_control
+    channel: 0
+  - platform: mcp4728
+    id: dac_isink
+    mcp4728_id: dac_control
+    channel: 1
+  - platform: mcp4728
+    id: dac_isrc
+    mcp4728_id: dac_control
+    channel: 2
+
+switch:
+  - platform: template
+    id: enable
+    name: "${name} Enable"  # published state is the enable target, current state is the state of the ranging GPIOs
+    turn_on_action:
+      - lambda: id(enable).publish_state(true);
+      - script.execute: update_voltage
+        # enable handled in buckboost_softstart_loop
+    turn_off_action:
+      - lambda: id(enable).publish_state(false);
+      - script.execute:
+          id: set_enable_range
+          overlap: false
+
+  - platform: gpio
+    id: range0
+    internal: true
+    name: "${name} Range0"
+    pin: GPIO8
+  - platform: gpio
+    id: range1
+    internal: true
+    name: "${name} Range1"
+    pin: GPIO18
+  - platform: gpio
+    id: control_enable
+    internal: true
+    name: "${name} Control Enable"
+    pin: GPIO38
+  - platform: gpio
+    id: conv_enable
+    internal: true
+    name: "${name} Conv Enable"
+    pin: GPIO40
+    inverted: true  # active-low enable
+  - platform: gpio
+    id: fan
+    name: "${name} Fan"
+    pin: GPIO11
+
+i2c:
+  scl: GPIO1
+  sda: GPIO2
+  frequency: 400kHz
+  scan: false
+
+spi:
+  clk_pin: GPIO15
+  mosi_pin: GPIO16
+  miso_pin: GPIO17
+
+pca9554:
+  - id: pca9554a_device
+    address: 0x38
+
+fusb302:
+  id: usbpd
+  target: 15v
+
+mcp3561:
+  cs_pin: GPIO7
+  id: adc_meas
+  osr: 40960  # up to 98304
+
+
+mcp4728:
+  id: dac_control
+
+font:
+  - file: "resources/4x6.bdf"  # characters actually 3x5 plus 1px descender
+    id: bdf4x6
+  - file: "resources/6x10.bdf"  # characters actually 5x7 plus 2px descender
+    id: bdf6x10
+    
+display:
+  - platform: ssd1306_i2c
+    model: "SSD1306 128x64"
+    address: 0x3c
+    reset_pin: GPIO12
+    update_interval : 200ms
+    lambda: |-
+      int baseline, unitsBaseline, dummy;
+      id(bdf6x10)->measure("X", &dummy, &dummy, &baseline, &dummy);
+      id(bdf4x6)->measure("X", &dummy, &dummy, &unitsBaseline, &dummy);
+      int unitsOffsY = baseline - unitsBaseline - 1;
+
+      // MEASUREMENT SECTION
+      it.printf(0, 0, id(bdf6x10), "MES");
+
+      int measureY = 0;
+      int voltageX = 4*6, currentX = 76;
+      int voltageUnitsX = voltageX + 6*6 + 4, currentUnitsX = currentX + 7*6 + 4 + 2;
+      drawValue(it, voltageX, measureY, id(bdf6x10), 2, 3, id(meas_voltage).get_state());
+      it.print(voltageUnitsX, measureY + unitsOffsY, id(bdf4x6), "V");
+      int currentDigitsDecimal = 4;
+      if (id(current_range).state == "300mA") {
+        currentDigitsDecimal = 5;
+      }
+      drawValue(it, currentX, measureY, id(bdf6x10), 1, currentDigitsDecimal, id(meas_current).get_state());
+      it.print(currentUnitsX, measureY + unitsOffsY, id(bdf4x6), "A");
+      
+      drawValue(it, voltageX, measureY + 10, id(bdf6x10), 2, 3, id(deriv_power).get_state());
+      it.print(voltageUnitsX, measureY + 10 + unitsOffsY, id(bdf4x6), "W");
+
+      drawValue(it, currentX, measureY + 10, id(bdf6x10), 4, 2, id(deriv_energy).get_state());
+      if (id(cursor) == 4) {
+        drawInverted(it, currentUnitsX, measureY + 10 + unitsOffsY, id(bdf4x6), "J");
+      } else {
+        it.print(currentUnitsX, measureY + 10 + unitsOffsY, id(bdf4x6), "J");
+      }
+
+      // SETPOINT SECTION
+      int setY = 26;
+      it.print(0, setY, id(bdf6x10), id(enable).state ? "ON " : "OFF");
+      
+      drawValue(it, voltageX, setY, id(bdf6x10), 2, 1, id(set_voltage).state, id(cursor) == 0 ? id(cursorDigit)[0] : -128);
+      it.print(voltageUnitsX, setY + unitsOffsY, id(bdf4x6), "V");
+
+      currentDigitsDecimal = 2;
+      if (id(current_range).state == "300mA") {
+        currentDigitsDecimal = 3;
+      }
+      drawValue(it, currentX, setY, id(bdf6x10), 1, currentDigitsDecimal, id(limit_current_max).state, id(cursor) == 1 ? id(cursorDigit)[1] : -128);
+      drawValue(it, currentX, setY + 10, id(bdf6x10), 1, currentDigitsDecimal, id(limit_current_min).state, id(cursor) == 2 ? id(cursorDigit)[2] : -128);
+      
+      it.print(currentUnitsX, setY + unitsOffsY, id(bdf4x6), "A");
+      it.print(currentUnitsX, setY + 10 + unitsOffsY, id(bdf4x6), "A");
+
+      if (id(kConfigCurrentRanges).state > 0) {  // ranging if supported
+        if (id(cursor) == 3) {
+          drawInverted(it, voltageUnitsX - 8, setY + 10, id(bdf6x10), TextAlign::TOP_RIGHT, id(current_range).state.c_str());
+        } else {
+          it.print(voltageUnitsX - 8, setY + 10, id(bdf6x10), TextAlign::TOP_RIGHT, id(current_range).state.c_str());
+        }
+        it.print(voltageUnitsX - 8, setY + 10 + unitsOffsY, id(bdf4x6), "Rng");
+      }
+
+      // DEVICE INFO
+      bool uncal = false;
+      if (id(kCalVoltageFactor).state == 1 || id(kCalVoltageOffset).state == 0 || id(kCalSetVoltageFactor).state == 1 || id(kCalSetVoltageOffset).state == 0 ||
+          id(kCalCurrent0Factor).state == 1 || id(kCalCurrent0Offset).state == 0 || id(kCalSetCurrent0Factor).state == 1 || id(kCalSetCurrent0Offset).state == 0) {
+        // TODO currently ignores the current 1 range since it's not supported on most boards
+        uncal = true;
+      }
+
+      char wifiSsidTrunc[16] = {0};
+      strncpy(wifiSsidTrunc, WiFi.SSID().c_str(), 15);
+      it.print(0, 64-6, id(bdf4x6), TextAlign::BOTTOM_LEFT, wifiSsidTrunc);
+      it.print(0, 64, id(bdf4x6), TextAlign::BOTTOM_LEFT, WiFi.localIP().toString().c_str());
+
+      it.printf(128, 64-6, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%sDucky SMU", uncal ? "-- UNCAL --  " : "");
+
+      const char* pdState;
+      switch (id(usbpd).get_state()) {
+        case UsbPdStateMachine::kConnected: pdState = "PD"; break;
+        default: pdState = "  ";
+      }
+
+      it.printf(128 - 4, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.f,%2.fc", pdState, id(fusb_vbus).get_state(), id(temp_buckboost).state, id(temp_fets).state);
+      if (millis() % 1000 >= 500) {
+        it.print(128, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, ".");  // liveness indicator
+      }
+
+number:
+  - platform: template
+    name: "${name} Set Voltage"
+    id: set_voltage
+    icon: mdi:high-voltage
+    mode: box
+    min_value: 0
+    max_value: 30
+    step: 0.01
+    unit_of_measurement: V
+    set_action:
+      - then:
+        - lambda: id(set_voltage).publish_state(x);
+        - script.execute: update_voltage
+
+  - platform: template
+    name: "${name} Set Current Min"
+    id: limit_current_min
+    icon: mdi:pan-up
+    mode: box
+    min_value: -3
+    max_value: -0.05
+    step: 0.01
+    unit_of_measurement: A
+    set_action:
+      - then:
+        - lambda: id(limit_current_min).publish_state(x);
+        - script.execute: update_current
+  - platform: template
+    name: "${name} Set Current Max"
+    id: limit_current_max
+    icon: mdi:pan-down
+    mode: box
+    min_value: 0.05
+    max_value: 3
+    step: 0.01
+    unit_of_measurement: A
+    set_action:
+      - then:
+        - lambda: id(limit_current_max).publish_state(x);
+        - script.execute: update_current
+  - platform: template
+    name: "${name} Buck-boost ratio"
+    internal: true
+    id: buckboost_ratio
+    icon: mdi:pan-down
+    min_value: 0
+    max_value: 1.5
+    step: 0.01
+    set_action:
+      - then:
+        - lambda: |-
+            // initialize DC at ratio = 1
+            float buckDc = 1 - id(kBuckBoostPwmDeadzone), boostDc = id(kBuckBoostPwmDeadzone);
+            if (x == 0) {  // turn off converter
+              buckDc = 0;
+              boostDc = 0;
+            } else if (x <= 1) {  // adjust buck dc
+              float boostRatio = 1 / (1 - boostDc);
+              buckDc = x / boostRatio;  // offset the minimal boost PWM
+            } else {  // adjust boost dc
+              float boostRatio = x / buckDc;  // offset the maximum buck PWM
+              boostDc = 1 - (1 / boostRatio);
+            }
+            id(buck_pwm)->write_state(buckDc);
+            id(boost_pwm)->write_state(boostDc);
+            ESP_LOGD("BuckBoostCtl", "Target %.02f, buck %.02f, boost %.02f", x, buckDc, boostDc);
+            id(buckboost_ratio).publish_state(x);
+
+  # These persistently store the calibration state, accessible via the REST API
+  - platform: template
+    name: "${name} Cal Voltage Meas Factor"  # multiply measured volts by this to get true volts
+    internal: true
+    id: kCalVoltageFactor
+    min_value: 0
+    max_value: 2
+    step: 0.0001
+    initial_value: 1
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalVoltageFactor).publish_state(x);
+  - platform: template
+    name: "${name} Cal Voltage Meas Offset"  # add to measured volts (post-scaling) to get true volts
+    internal: true
+    id: kCalVoltageOffset
+    min_value: -1
+    max_value: 1
+    step: 0.0001
+    initial_value: 0
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalVoltageOffset).publish_state(x);
+  - platform: template
+    name: "${name} Cal Voltage Set Factor"  # multiply by set volts to get true volts
+    internal: true
+    id: kCalSetVoltageFactor
+    min_value: 0
+    max_value: 2
+    step: 0.0001
+    initial_value: 1
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalSetVoltageFactor).publish_state(x);
+  - platform: template
+    name: "${name} Cal Voltage Set Offset"  # add to set volts to get true volts
+    internal: true
+    id: kCalSetVoltageOffset
+    min_value: -1
+    max_value: 1
+    step: 0.0001
+    initial_value: 0
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalSetVoltageOffset).publish_state(x);
+
+  - platform: template
+    name: "${name} Cal Current0 Meas Factor"  # multiply measured amps by this to get true amps
+    internal: true
+    id: kCalCurrent0Factor
+    min_value: 0
+    max_value: 2
+    step: 0.0001
+    initial_value: 1
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalCurrent0Factor).publish_state(x);
+  - platform: template
+    name: "${name} Cal Current0 Meas Offset"  # add to measured amps (post-scaling) to get true amps
+    internal: true
+    id: kCalCurrent0Offset
+    min_value: -1
+    max_value: 1
+    step: 0.0001
+    initial_value: 0
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalCurrent0Offset).publish_state(x);
+  - platform: template
+    name: "${name} Cal Current0 Set Factor"  # multiply by set amps to get true amps - note varies with voltage!
+    internal: true
+    id: kCalSetCurrent0Factor
+    min_value: 0
+    max_value: 2
+    step: 0.0001
+    initial_value: 1
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalSetCurrent0Factor).publish_state(x);
+  - platform: template
+    name: "${name} Cal Current0 Set Offset"  # add to set amps to get true amps
+    internal: true
+    id: kCalSetCurrent0Offset
+    min_value: -1
+    max_value: 1
+    step: 0.0001
+    initial_value: 0
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalSetCurrent0Offset).publish_state(x);
+
+  - platform: template
+    name: "${name} Cal Current1 Meas Factor"
+    internal: true
+    id: kCalCurrent1Factor
+    min_value: 0
+    max_value: 2
+    step: 0.0001
+    initial_value: 1
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalCurrent1Factor).publish_state(x);
+  - platform: template
+    name: "${name} Cal Current1 Meas Offset"
+    internal: true
+    id: kCalCurrent1Offset
+    min_value: -1
+    max_value: 1
+    step: 0.0001
+    initial_value: 0
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalCurrent1Offset).publish_state(x);
+  - platform: template
+    name: "${name} Cal Current1 Set Factor"
+    internal: true
+    id: kCalSetCurrent1Factor
+    min_value: 0
+    max_value: 2
+    step: 0.0001
+    initial_value: 1
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalSetCurrent1Factor).publish_state(x);
+  - platform: template
+    name: "${name} Cal Current1 Set Offset"
+    internal: true
+    id: kCalSetCurrent1Offset
+    min_value: -1
+    max_value: 1
+    step: 0.0001
+    initial_value: 0
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalSetCurrent1Offset).publish_state(x);
+  - platform: template
+    name: "${name} Config Current Ranges"
+    internal: true
+    id: kConfigCurrentRanges
+    min_value: 0
+    max_value: 1
+    step: 1
+    initial_value: 0
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kConfigCurrentRanges).publish_state(x);
+
+select:
+  - platform: template  # published state is the target range, current range is the state of the ranging GPIOs
+    name: "${name} Set Current Range"
+    id: current_range
+    options:
+     - "3A"
+     - "300mA"
+    initial_option: "3A"
+    set_action:
+      - lambda: |-
+          if (id(kConfigCurrentRanges).state > 0) {
+            id(current_range).publish_state(x);
+          } else {
+            id(current_range).publish_state("3A");  // ranging disabled
+          }
+      - script.execute: update_current
+      - script.execute:
+          id: set_enable_range
+          overlap: true
+      - delay: 5 ms
+      - script.execute:
+          id: set_enable_range
+          overlap: false
+
+button:
+  - platform: template
+    id: integrator_reset
+    name: Reset integrators
+    on_press:
+      then:
+        - sensor.integration.reset: deriv_energy
+        - sensor.integration.reset: deriv_accum_current
+
+binary_sensor:
+  - platform: gpio
+    id: conv_en_sense
+    name: "${name} Conv En Sen"
+    internal: true
+    pin: 
+      number: GPIO21
+      mode:
+        input: true
+  - platform: gpio
+    id: encoder_sw
+    name: "${name} Encoder Sw"
+    internal: true
+    pin: 
+      number: GPIO4
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    filters:
+      - delayed_on: 10ms
+    on_click:
+    - then:
+        - switch.toggle: enable
+  - platform: gpio
+    id: dir_sw
+    name: "${name} Dir Sw"
+    internal: true
+    pin: 
+      pca9554: pca9554a_device
+      number: 0
+      inverted: true
+      mode:
+        input: true
+    filters:
+      - delayed_on: 10ms
+    on_click:
+    - then:
+        - lambda: |-
+            if (id(cursor) == 4) {
+              id(integrator_reset).press();
+            }
+  - platform: gpio
+    name: "${name} Dir Up"
+    internal: true
+    pin: 
+      pca9554: pca9554a_device
+      number: 1
+      inverted: true
+      mode:
+        input: true
+    filters:
+      - delayed_on: 10ms
+    on_click:
+    - then:
+        - lambda: |-
+            const size_t choices = sizeof(id(cursorDigit)) / sizeof(id(cursorDigit)[0]);
+            do {
+              id(cursor) = (id(cursor) - 1 + choices) % choices;  // signed modulo is undefined
+            } while (id(kConfigCurrentRanges).state == 0 && id(cursor) == 3);  // skip range if not available
+  - platform: gpio
+    name: "${name} Dir Down"
+    internal: true
+    pin: 
+      pca9554: pca9554a_device
+      number: 3
+      inverted: true
+      mode:
+        input: true
+    filters:
+      - delayed_on: 10ms
+    on_click:
+    - then:
+        - lambda: |-
+            do {
+              id(cursor) = (id(cursor) + 1) % (sizeof(id(cursorDigit)) / sizeof(id(cursorDigit)[0]));
+            } while (id(kConfigCurrentRanges).state == 0 && id(cursor) == 3);  // skip range if not available
+  - platform: gpio
+    name: "${name} Dir Left"
+    internal: true
+    pin: 
+      pca9554: pca9554a_device
+      number: 4
+      inverted: true
+      mode:
+        input: true
+    filters:
+      - delayed_on: 10ms
+    on_click:
+    - then:
+        - lambda: |-
+            id(cursorDigit)[id(cursor)] = min(id(cursorDigit)[id(cursor)] + 1, id(kCursorDigitLimits)[id(cursor)][1]);
+            if (id(cursor) == 3) {
+              auto index = id(current_range).active_index();
+              if (index.has_value()) {
+                id(current_range)->make_call().set_index(index.value() - 1).perform();
+              }
+            } else if (id(cursor) == 4) {
+              id(integrator_reset).press();
+            }
+  - platform: gpio
+    name: "${name} Dir Right"
+    internal: true
+    pin: 
+      pca9554: pca9554a_device
+      number: 2
+      inverted: true
+      mode:
+        input: true
+    filters:
+      - delayed_on: 10ms
+    on_click:
+    - then:
+        - lambda: |-
+            id(cursorDigit)[id(cursor)] = max(id(cursorDigit)[id(cursor)] - 1, id(kCursorDigitLimits)[id(cursor)][0]);
+            if (id(cursor) == 3) {
+              auto index = id(current_range).active_index();
+              if (index.has_value()) {
+                id(current_range)->make_call().set_index(index.value() + 1).perform();
+              }
+            } else if (id(cursor) == 4) {
+              id(integrator_reset).press();
+            }
+
+sensor:
+  - platform: fusb302
+    vbus:
+      id: fusb_vbus
+      name: "${name} PD VBus"
+      filters:  # limit to 1 update/s or on fast change
+        - or:
+          - throttle : 1s
+          - delta: 1.0
+    selected_voltage:
+      id: fusb_selected_voltage
+      name: "${name} PD Selected Voltage"
+    selected_current:
+      id: fusb_selected_current
+      name: "${name} PD Selected Current"
+  - platform: mcp3561
+    id: meas_voltage
+    name: "${name} Meas Voltage"
+    update_interval: 0.01s  # as fast as possible, limited by ADC conversion time
+    accuracy_decimals: 4
+    mcp3561_id: adc_meas
+    channel: CH2
+    channel_neg: CH0  # pin 0 is vcenter
+    filters:
+      - lambda: |-
+          id(adc_voltage).publish_state(id(meas_voltage).rawValue);
+          return x * id(kVref) * id(kVoltageRatio) * id(kCalVoltageFactor).state + id(kCalVoltageOffset).state;
+  - platform: mcp3561
+    id: meas_current
+    name: "${name} Meas Current"
+    update_interval: 0.01s  # as fast as possible, limited by ADC conversion time
+    accuracy_decimals: 5
+    mcp3561_id: adc_meas
+    channel: CH1
+    channel_neg: CH0  # pin 0 is vcenter
+    filters:
+      - lambda: |-
+          static int8_t lastRange = -1;  // -1=off, 0=range0, 1=...
+          int8_t thisRange = -1;
+          static bool lastSampleValid = true;
+          if (id(range0)->state && !id(range1)->state) {
+            thisRange = 0;
+          } else if (id(range1)->state && !id(range0)->state) {
+            thisRange = 1;
+          }
+          id(adc_current).publish_state(id(meas_current).rawValue);
+
+          if (lastRange != thisRange || thisRange < 0) {  // invalidate the measurement on a range change
+            lastRange = thisRange;
+            if (thisRange < 0 && !lastSampleValid) {  // send NaNs after an initial zero - the zero for integrators to not integrate over the dead time
+              return NAN;
+            } else {
+              lastSampleValid = false;
+              return 0;
+            }
+          }
+
+          auto value = x * id(kVref);
+          if (thisRange == 0) {
+            value = value * id(kCurrentRatio0) * id(kCalCurrent0Factor).state + id(kCalCurrent0Offset).state;
+          } else if (thisRange == 1) {
+            value = value * id(kCurrentRatio1) * id(kCalCurrent1Factor).state + id(kCalCurrent1Offset).state;
+          }
+          lastSampleValid = true;
+          return value;
+    unit_of_measurement: A
+
+  - platform: combination
+    name: "${name} Meas Voltage Noise"
+    id: meas_voltage_noise
+    type: sum  # dummy
+    internal: true
+    accuracy_decimals: 6
+    sources:
+      - source: meas_voltage
+    filters:
+      - range:
+          window_size: 25
+          send_every: 5
+  - platform: combination
+    name: "${name} Meas Current Noise"
+    id: meas_current_noise
+    type: sum  # dummy
+    internal: true
+    accuracy_decimals: 7
+    sources:
+      - source: meas_current
+    filters:
+      - range:
+          window_size: 25
+          send_every: 5
+
+  - platform: combination
+    name: "${name} Meas Volage Max"
+    id: meas_voltage_max
+    type: sum  # dummy
+    internal: true
+    accuracy_decimals: 7
+    sources:
+      - source: meas_voltage
+    filters:
+      - max:
+          window_size: 5
+          send_every: 1
+
+  - platform: combination
+    name: "${name} Deriv Power"
+    id: deriv_power
+    type: sum  # dummy
+    accuracy_decimals: 6
+    unit_of_measurement: W
+    sources:
+      - source: meas_voltage
+      - source: meas_current
+    filters:
+      - lambda: |-
+          return id(meas_voltage).state * id(meas_current).state;
+
+  - platform: integration
+    name: "${name} Deriv Energy"
+    id: deriv_energy
+    sensor: deriv_power
+    time_unit: s
+    integration_method: left  # NaNs don't update state, this integrates the zero over the dead period
+    accuracy_decimals: 6
+    unit_of_measurement: J
+
+  - platform: integration
+    name: "${name} Deriv Cumulative Current"
+    id: deriv_accum_current
+    sensor: meas_current
+    time_unit: h
+    integration_method: left  # NaNs don't update state, this integrates the zero over the dead period
+    accuracy_decimals: 6
+    unit_of_measurement: Ah
+
+  - platform: template
+    name: "${name} Meas ADC Voltage"
+    id: adc_voltage
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    name: "${name} Meas ADC Current"
+    id: adc_current
+    accuracy_decimals: 0
+    internal: true
+    
+  # - platform: mcp3561  # TESTING OUTPUT for absolute ADC output
+  #   name: "${name} Int VCenter"
+  #   update_interval: 1s
+  #   mcp3561_id: adc_meas
+  #   channel: CH0
+  #   channel_neg: AGND
+  #   filters:
+  #     - lambda: |-
+  #         return x * id(kVref);
+
+  - platform: adc
+    id: adc_vconv
+    name: "${name} Int VConv"
+    pin: GPIO10
+    accuracy_decimals: 2
+    update_interval: 0.25s
+    attenuation: auto
+    filters:
+      - multiply: 14
+ 
+  - platform: tmp1075n
+    id: temp_fets
+    address: 0x48
+    name: "${name} Temp FETs"
+    update_interval: 1s
+  - platform: tmp1075n
+    id: temp_buckboost
+    address: 0x49
+    name: "${name} Temp Buck-boost"
+    update_interval: 1s
+
+  - platform: rotary_encoder
+    id: encoder
+    name: "${name} Encoder"
+    internal: true
+    resolution: 2  # so each detent generates one action
+    pin_a:
+      number: GPIO5
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    pin_b:
+      number: GPIO6
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    on_clockwise:
+    - then:
+        - lambda: |-
+            float increment = pow(10, id(cursorDigit)[id(cursor)]);
+            if (id(cursor) == 0) {
+              id(set_voltage)->make_call().set_value(id(set_voltage)->state + increment).perform();
+            } else if (id(cursor) == 1) {
+              id(limit_current_max)->make_call().set_value(id(limit_current_max)->state + increment).perform();
+            } else if (id(cursor) == 2) {
+              id(limit_current_min)->make_call().set_value(id(limit_current_min)->state + increment).perform();
+            }
+    on_anticlockwise:
+    - then:
+        - lambda: |-
+            float increment = -pow(10, id(cursorDigit)[id(cursor)]);
+            if (id(cursor) == 0) {
+              id(set_voltage)->make_call().set_value(id(set_voltage)->state + increment).perform();
+            } else if (id(cursor) == 1) {
+              id(limit_current_max)->make_call().set_value(id(limit_current_max)->state + increment).perform();
+            } else if (id(cursor) == 2) {
+              id(limit_current_min)->make_call().set_value(id(limit_current_min)->state + increment).perform();
+            }
+
+text_sensor:
+  - platform: version
+    name: "${name} Version"
+    internal: true
+  - platform: wifi_info
+    mac_address:
+      name: "${name} Mac Wifi"
+      internal: true
+
+sample_buffer:
+  id: smu_meas
+  sources:
+    - source: meas_voltage
+      name: "V"
+    - source: meas_current
+      name: "A"
+    - source: deriv_energy
+      name: "J"
+    - source: deriv_accum_current
+      name: "Ah"

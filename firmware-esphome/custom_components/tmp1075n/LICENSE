@@ -1,0 +1,7 @@
+This is a modification of the TMP1075 code from ESPHome:
+https://github.com/esphome/esphome/tree/dev/esphome/components/tmp1075
+
+See the ESPHome license here:
+https://github.com/esphome/esphome/blob/dev/LICENSE
+
+This code will be removed once TMP1075N support is added upstream.
