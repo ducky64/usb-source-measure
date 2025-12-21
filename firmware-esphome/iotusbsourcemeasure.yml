@@ -186,6 +186,26 @@ light:
     pin:
       number: GPIO0
       inverted: true
+  # - platform: neopixelbus  # library seems broken
+  #   id: npx
+  #   variant: sk6812
+  #   pin: GPIO38
+  #   num_leds: 6
+  #   name: "${name} Neopixels"
+  #   effects:
+  #     - addressable_rainbow:
+  #         name: Rainbow
+  - platform: esp32_rmt_led_strip
+    id: npx
+    rmt_channel: 0
+    rgb_order: GRB
+    chipset: SK6812
+    pin: GPIO38
+    num_leds: 6
+    name: "${name} Neopixels"
+    effects:
+      - addressable_rainbow:
+          name: Rainbow
 
 output:
   - platform: mcpwm_sync
@@ -232,7 +252,7 @@ switch:
 
   - platform: gpio
     id: vin_ramp
-    internal: true
+    # internal: true
     name: "${name} Vin Ramp"
     pin:
       pca9554: ioe_ctl
@@ -247,7 +267,7 @@ switch:
       number: 4
   - platform: gpio
     id: conv_enable
-    internal: true
+    # internal: true
     name: "${name} Conv Enable"
     pin:
       pca9554: ioe_ctl
@@ -409,8 +429,8 @@ display:
         case UsbPdStateMachine::kConnected: pdState = "PD"; break;
         default: pdState = "  ";
       }
-
-      it.printf(128 - 4, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.f,%2.fc", pdState, id(fusb_vbus).get_state(), id(temp_buckboost).state, id(temp_fets).state);
+      // TODO re-enable once temp sensors mounted
+      // it.printf(128 - 4, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.f,%2.fc", pdState, id(fusb_vbus).get_state(), id(temp_buckboost).state, id(temp_fets).state);
       if (millis() % 1000 >= 500) {
         it.print(128, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, ".");  // liveness indicator
       }
@@ -458,7 +478,7 @@ number:
         - script.execute: update_current
   - platform: template
     name: "${name} Buck-boost ratio"
-    internal: true
+    # internal: true
     id: buckboost_ratio
     icon: mdi:pan-down
     min_value: 0
@@ -680,8 +700,8 @@ button:
 binary_sensor:
   - platform: gpio
     id: conv_en_sense
-    name: "${name} Conv En Sen"
-    internal: true
+    name: "${name} Conv OVP Sen"
+    # internal: true
     pin: 
       pca9554: ioe_ctl
       number: 3
@@ -705,7 +725,7 @@ binary_sensor:
   - platform: gpio
     id: dir_sw
     name: "${name} Dir Sw"
-    internal: true
+    # internal: true
     pin: 
       pca9554: ioe_ui
       number: 1
@@ -722,7 +742,7 @@ binary_sensor:
             }
   - platform: gpio
     name: "${name} Dir Up"
-    internal: true
+    # internal: true
     pin: 
       pca9554: ioe_ui
       number: 0
@@ -740,10 +760,10 @@ binary_sensor:
             } while (id(kConfigCurrentRanges).state == 0 && id(cursor) == 3);  // skip range if not available
   - platform: gpio
     name: "${name} Dir Down"
-    internal: true
+    # internal: true
     pin: 
       pca9554: ioe_ui
-      number: 7
+      number: 3
       inverted: true
       mode:
         input: true
@@ -757,7 +777,7 @@ binary_sensor:
             } while (id(kConfigCurrentRanges).state == 0 && id(cursor) == 3);  // skip range if not available
   - platform: gpio
     name: "${name} Dir Left"
-    internal: true
+    # internal: true
     pin: 
       pca9554: ioe_ui
       number: 2
@@ -780,10 +800,10 @@ binary_sensor:
             }
   - platform: gpio
     name: "${name} Dir Right"
-    internal: true
+    # internal: true
     pin: 
       pca9554: ioe_ui
-      number: 3
+      number: 7
       inverted: true
       mode:
         input: true
@@ -969,21 +989,43 @@ sensor:
     filters:
       - multiply: 14
  
-  - platform: tmp1075n
-    id: temp_fets
-    address: 0x48
-    name: "${name} Temp FETs"
+ # TODO re-enable once chips added
+  # - platform: tmp1075n
+  #   id: temp_fets
+  #   address: 0x48
+  #   name: "${name} Temp FETs"
+  #   update_interval: 1s
+  # - platform: tmp1075n
+  #   id: temp_buckboost
+  #   address: 0x49
+  #   name: "${name} Temp Buck-boost"
+  #   update_interval: 1s
+
+  - platform: ina219
+    address: 0x40
+    shunt_resistance: 0.01 ohm
+    current:
+      name: "Vin Current"
+    power:
+      name: "Vin Power"
+    bus_voltage:
+      name: "Vin Bus Voltage"
     update_interval: 1s
-  - platform: tmp1075n
-    id: temp_buckboost
-    address: 0x49
-    name: "${name} Temp Buck-boost"
+  - platform: ina219
+    address: 0x44
+    shunt_resistance: 0.01 ohm
+    current:
+      name: "Vconv Current"
+    power:
+      name: "Vconv Power"
+    bus_voltage:
+      name: "Vconv Bus Voltage"
     update_interval: 1s
 
   - platform: rotary_encoder
     id: encoder
     name: "${name} Encoder"
-    internal: true
+    # internal: true
     resolution: 2  # so each detent generates one action
     pin_a:
       number: GPIO42
