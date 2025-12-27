@@ -20,10 +20,48 @@ light:
     pin: GPIO38
     num_leds: 6
     name: "${name} Neopixels"
+    initial_state:
+      brightness: 33%
+    restore_mode: ALWAYS_ON
     default_transition_length: 0s  # instantaneous
     effects:
+      - addressable_lambda:
+          name: "Smu"
+          update_interval: 50ms
+          lambda: |-
+            it.all() = Color(0, 0, 0, 0);
+
+            switch (id(usbpd).get_state()) {
+              case UsbPdStateMachine::kConnected: it[5] = Color(0, 255, 0, 0); break;
+              default: it[5] = Color(255, 255, 0, 0);
+            }
+
+            if (id(enable).state) {
+              if (id(control_limit_source).state) {
+                it[4] = Color(255, 255, 0, 0);
+
+                it[1] = Color(255, 0, 0, 0);
+                it[3] = Color(0, 0, 0, 0);
+              } else if (id(control_limit_sink).state) {
+                it[4] = Color(255, 255, 0, 0);
+
+                it[1] = Color(0, 0, 0, 0);
+                it[3] = Color(255, 0, 0, 0);
+              } else {  // voltage mode
+                it[4] = Color(0, 255, 0, 0);
+
+                it[1] = Color(0, 0, 0, 0);
+                it[3] = Color(0, 0, 0, 0);
+              }
+            } else {
+              it[4] = Color(127, 0, 127, 0);  // dim purple for off
+            }
       - addressable_rainbow:
           name: Rainbow  # for testing only
+    on_turn_on:
+      - light.turn_on:
+          id: npx
+          effect: "Smu"
   - platform: status_led
     name: "${name} Dbg"
     id: debug_led
@@ -31,7 +69,7 @@ light:
     pin:
       number: GPIO0
       inverted: true
-      
+
 font:
   - file: "resources/4x6.bdf"  # characters actually 3x5 plus 1px descender
     id: bdf4x6
@@ -240,7 +278,8 @@ sensor:
   - platform: rotary_encoder
     id: encoder
     name: "${name} Encoder"
-    # internal: true
+    restore_mode: ALWAYS_ZERO
+    internal: true
     resolution: 2  # so each detent generates one action
     pin_a:
       number: GPIO42

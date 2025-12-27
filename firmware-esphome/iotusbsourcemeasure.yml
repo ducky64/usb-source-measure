@@ -33,13 +33,6 @@ esphome:
     - delay: 1.0s  # assume enough time for PD to negotiate
     - switch.turn_on: vin_ramp
 
-    - delay: 0.1s  # wait for LEDs to power on
-    - light.turn_on:
-        id: npx
-        brightness: 1%
-    - script.execute:
-        id: set_enable_range
-        overlap: false
   on_loop:
     - script.execute: buckboost_control_loop
   includes:
@@ -153,15 +146,11 @@ script:
         float limitMaxVolts = id(kVCenter) - ((id(limit_current_max).state - setCurrentOffset) / setCurrentFactor);
         id(dac_isrc)->write_state(limitMaxVolts / id(kVref));
 
-        ESP_LOGE("update_current", "Write DAC isnk=%.03f, isrc=%.03f", limitMinVolts / id(kVref), limitMaxVolts / id(kVref));
-
   - id: set_enable_range  # sets the overall enable and current ranging IOs, based on the ranging and enable target
     parameters:
       overlap: bool  # if true does not turn off other ranges, this allows overlap (though at a much reduced current limit) during the swap
     then:
     - lambda: |-
-        auto npx_output = ((AddressableLight*)id(npx).get_output());
-
         if (id(enable).state) {  // turn on, figure out ranging
           if (id(current_range).state == "3A") {
             id(range0).turn_on();
@@ -186,18 +175,14 @@ script:
             return;
           }
           id(control_enable).turn_on();
-
-          npx_output->get(4).set(Color(0, 255, 0));
+          id(gate_hi).turn_on();
         } else {  // turn off
           id(range0).turn_off();
           id(range1).turn_off();
           id(range2).turn_off();
           id(control_enable).turn_off();
-
-          npx_output->get(4).set(Color(255, 0, 255));
+          id(gate_hi).turn_off();
         }
-
-        npx_output->schedule_show();
 
   - id: update_voltage  # update the voltage
     then:
@@ -383,7 +368,7 @@ number:
     mode: box
     min_value: -3
     max_value: -0.01
-    step: 0.01
+    step: 0.001
     unit_of_measurement: A
     set_action:
       - then:
@@ -396,7 +381,7 @@ number:
     mode: box
     min_value: 0.01
     max_value: 3
-    step: 0.01
+    step: 0.001
     unit_of_measurement: A
     set_action:
       - then:
@@ -464,12 +449,28 @@ binary_sensor:
   - platform: gpio
     id: conv_en_sense
     name: "${name} Conv OVP Sen"
-    # internal: true
     pin: 
       pca9554: ioe_ctl
       number: 3
       mode:
         input: true
+
+  - platform: gpio
+    id: control_limit_source
+    name: "${name} Control Limit Source"
+    pin: 
+      number: GPIO14
+      mode:
+        input: true
+        pullup: true
+  - platform: gpio
+    id: control_limit_sink
+    name: "${name} Control Limit Sink"
+    pin: 
+      number: GPIO21
+      mode:
+        input: true
+        pullup: true
 
 sensor:
   - platform: fusb302
