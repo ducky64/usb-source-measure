@@ -150,6 +150,7 @@ script:
     parameters:
       overlap: bool  # if true does not turn off other ranges, this allows overlap (though at a much reduced current limit) during the swap
     then:
+    - script.execute: update_current
     - lambda: |-
         if (id(enable).state) {  // turn on, figure out ranging
           if (id(current_range).state == "3A") {
@@ -176,12 +177,14 @@ script:
           }
           id(control_enable).turn_on();
           id(gate_hi).turn_on();
+          id(gate_lo).turn_off();  // TODO apply deadzone, intelligent on/off
         } else {  // turn off
           id(range0).turn_off();
           id(range1).turn_off();
           id(range2).turn_off();
           id(control_enable).turn_off();
           id(gate_hi).turn_off();
+          id(gate_lo).turn_off();
         }
 
   - id: update_voltage  # update the voltage

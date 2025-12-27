@@ -21,8 +21,8 @@ light:
     num_leds: 6
     name: "${name} Neopixels"
     initial_state:
-      brightness: 33%
-    restore_mode: ALWAYS_ON
+      state: ON
+    restore_mode: RESTORE_AND_ON  # persistent brightness settings
     default_transition_length: 0s  # instantaneous
     effects:
       - addressable_lambda:
