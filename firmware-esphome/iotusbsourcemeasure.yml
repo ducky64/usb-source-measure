@@ -20,11 +20,21 @@ esphome:
     - number.set:
         id: buckboost_ratio
         value: 0.0
-    - switch.turn_on: conv_enable
+
+    - switch.turn_on: conv_enable  # pulse conv enable latch
     - delay: 0.1s
     - switch.turn_off: conv_enable
+
     - delay: 1.0s  # assume enough time for PD to negotiate
     - switch.turn_on: vin_ramp
+
+    - delay: 0.1s  # wait for LEDs to power on
+    - light.turn_on:
+        id: npx
+        brightness: 1%
+    - script.execute:
+        id: set_enable_range
+        overlap: false
   on_loop:
     - script.execute: buckboost_control_loop
   includes:
@@ -76,8 +86,10 @@ globals:
     initial_value: '1.02'  # 1/(0.1 (resistor) * 9.82 (diffamp))
   - id: kCurrentRatio1
     type: float
-    initial_value: '10.2'  # 1/(1 (resistor) * 9.82 (diffamp))
-  # TODO range[2] = 10 ohm
+    initial_value: '0.102'  # 1/(1 (resistor) * 9.82 (diffamp))
+  - id: kCurrentRatio2
+    type: float
+    initial_value: '0.0102'  # 1/(10 (resistor) * 9.82 (diffamp))
   - id: kVCenter
     type: float
     initial_value: '1.65'  # theoretical
@@ -134,6 +146,9 @@ script:
         } else if (id(current_range).state == "300mA") {
           setCurrentFactor = id(kCalSetCurrent1Factor).state * id(kCurrentRatio1);
           setCurrentOffset = id(kCalSetCurrent1Offset).state;
+        } else if (id(current_range).state == "30mA") {
+          setCurrentFactor = id(kCalSetCurrent2Factor).state * id(kCurrentRatio2);
+          setCurrentOffset = id(kCalSetCurrent2Offset).state;
         } else {
           ESP_LOGE("update_current", "Unknown range %s", id(current_range).state);
         }
@@ -143,34 +158,51 @@ script:
         float limitMaxVolts = id(kVCenter) - ((id(limit_current_max).state - setCurrentOffset) / setCurrentFactor);
         id(dac_isrc)->write_state(limitMaxVolts / id(kVref));
 
+        ESP_LOGE("update_current", "Write DAC isnk=%.03f, isrc=%.03f", limitMinVolts / id(kVref), limitMaxVolts / id(kVref));
+
   - id: set_enable_range  # sets the overall enable and current ranging IOs, based on the ranging and enable target
     parameters:
       overlap: bool  # if true does not turn off other ranges, this allows overlap (though at a much reduced current limit) during the swap
     then:
     - lambda: |-
+        auto npx_output = ((AddressableLight*)id(npx).get_output());
+
         if (id(enable).state) {  // turn on, figure out ranging
           if (id(current_range).state == "3A") {
             id(range0).turn_on();
             if (!overlap) {
               id(range1).turn_off();
+              id(range2).turn_off();
             }
           } else if (id(current_range).state == "300mA") {
             id(range1).turn_on();
             if (!overlap) {
               id(range0).turn_off();
+              id(range2).turn_off();
+            }
+          } else if (id(current_range).state == "30mA") {
+            id(range2).turn_on();
+            if (!overlap) {
+              id(range0).turn_off();
+              id(range1).turn_off();
             }
           } else {
             ESP_LOGE("set_enable_range", "Unknown range %s", id(current_range).state);
             return;
           }
           id(control_enable).turn_on();
-          // TODO RGB LEDs
+
+          npx_output->get(4).set(Color(0, 255, 0));
         } else {  // turn off
           id(range0).turn_off();
           id(range1).turn_off();
+          id(range2).turn_off();
           id(control_enable).turn_off();
-          // TODO RGB LEDs
+
+          npx_output->get(4).set(Color(255, 0, 255));
         }
+
+        npx_output->schedule_show();
 
   - id: update_voltage  # update the voltage
     then:
@@ -197,9 +229,10 @@ light:
     pin: GPIO38
     num_leds: 6
     name: "${name} Neopixels"
+    default_transition_length: 0s  # instantaneous
     effects:
       - addressable_rainbow:
-          name: Rainbow
+          name: Rainbow  # for testing only
 
 output:
   - platform: mcpwm_sync
@@ -312,6 +345,13 @@ switch:
     pin:
       pca9554: ioe_ui
       number: 4
+  - platform: gpio
+    id: range2
+    internal: true
+    name: "${name} Range2"
+    pin:
+      pca9554: ioe_ui
+      number: 5
 
   - platform: gpio
     id: fan
@@ -375,7 +415,7 @@ display:
       drawValue(it, voltageX, measureY, id(bdf6x10), 2, 3, id(meas_voltage).get_state());
       it.print(voltageUnitsX, measureY + unitsOffsY, id(bdf4x6), "V");
       int currentDigitsDecimal = 4;
-      if (id(current_range).state == "300mA") {
+      if (id(current_range).state == "300mA" || id(current_range).state == "30mA") {
         currentDigitsDecimal = 5;
       }
       drawValue(it, currentX, measureY, id(bdf6x10), 1, currentDigitsDecimal, id(meas_current).get_state());
@@ -399,7 +439,7 @@ display:
       it.print(voltageUnitsX, setY + unitsOffsY, id(bdf4x6), "V");
 
       currentDigitsDecimal = 2;
-      if (id(current_range).state == "300mA") {
+      if (id(current_range).state == "300mA" || id(current_range).state == "30mA") {
         currentDigitsDecimal = 3;
       }
       drawValue(it, currentX, setY, id(bdf6x10), 1, currentDigitsDecimal, id(limit_current_max).state, id(cursor) == 1 ? id(cursorDigit)[1] : -128);
@@ -408,14 +448,12 @@ display:
       it.print(currentUnitsX, setY + unitsOffsY, id(bdf4x6), "A");
       it.print(currentUnitsX, setY + 10 + unitsOffsY, id(bdf4x6), "A");
 
-      if (id(kConfigCurrentRanges).state > 0) {  // ranging if supported
-        if (id(cursor) == 3) {
-          drawInverted(it, voltageUnitsX - 8, setY + 10, id(bdf6x10), TextAlign::TOP_RIGHT, id(current_range).state.c_str());
-        } else {
-          it.print(voltageUnitsX - 8, setY + 10, id(bdf6x10), TextAlign::TOP_RIGHT, id(current_range).state.c_str());
-        }
-        it.print(voltageUnitsX - 8, setY + 10 + unitsOffsY, id(bdf4x6), "Rng");
+      if (id(cursor) == 3) {
+        drawInverted(it, voltageUnitsX - 8, setY + 10, id(bdf6x10), TextAlign::TOP_RIGHT, id(current_range).state.c_str());
+      } else {
+        it.print(voltageUnitsX - 8, setY + 10, id(bdf6x10), TextAlign::TOP_RIGHT, id(current_range).state.c_str());
       }
+      it.print(voltageUnitsX - 8, setY + 10 + unitsOffsY, id(bdf4x6), "Rng");
 
       // DEVICE INFO
       bool uncal = false;
@@ -463,7 +501,7 @@ number:
     icon: mdi:pan-up
     mode: box
     min_value: -3
-    max_value: -0.05
+    max_value: -0.01
     step: 0.01
     unit_of_measurement: A
     set_action:
@@ -475,7 +513,7 @@ number:
     id: limit_current_max
     icon: mdi:pan-down
     mode: box
-    min_value: 0.05
+    min_value: 0.01
     max_value: 3
     step: 0.01
     unit_of_measurement: A
@@ -658,18 +696,55 @@ number:
     set_action:
       - then:
         - lambda: id(kCalSetCurrent1Offset).publish_state(x);
+
   - platform: template
-    name: "${name} Config Current Ranges"
+    name: "${name} Cal Current2 Meas Factor"
     internal: true
-    id: kConfigCurrentRanges
+    id: kCalCurrent2Factor
     min_value: 0
+    max_value: 2
+    step: 0.0001
+    initial_value: 1
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalCurrent2Factor).publish_state(x);
+  - platform: template
+    name: "${name} Cal Current2 Meas Offset"
+    internal: true
+    id: kCalCurrent2Offset
+    min_value: -1
     max_value: 1
-    step: 1
+    step: 0.0001
     initial_value: 0
     restore_value: true
     set_action:
       - then:
-        - lambda: id(kConfigCurrentRanges).publish_state(x);
+        - lambda: id(kCalCurrent2Offset).publish_state(x);
+  - platform: template
+    name: "${name} Cal Current2 Set Factor"
+    internal: true
+    id: kCalSetCurrent2Factor
+    min_value: 0
+    max_value: 2
+    step: 0.0001
+    initial_value: 1
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalSetCurrent2Factor).publish_state(x);
+  - platform: template
+    name: "${name} Cal Current2 Set Offset"
+    internal: true
+    id: kCalSetCurrent2Offset
+    min_value: -1
+    max_value: 1
+    step: 0.0001
+    initial_value: 0
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalSetCurrent2Offset).publish_state(x);
 
 select:
   - platform: template  # published state is the target range, current range is the state of the ranging GPIOs
@@ -678,14 +753,11 @@ select:
     options:
      - "3A"
      - "300mA"
+     - "30mA"
     initial_option: "3A"
     set_action:
       - lambda: |-
-          if (id(kConfigCurrentRanges).state > 0) {
-            id(current_range).publish_state(x);
-          } else {
-            id(current_range).publish_state("3A");  // ranging disabled
-          }
+          id(current_range).publish_state(x);
       - script.execute: update_current
       - script.execute:
           id: set_enable_range
@@ -762,9 +834,7 @@ binary_sensor:
     - then:
         - lambda: |-
             const size_t choices = sizeof(id(cursorDigit)) / sizeof(id(cursorDigit)[0]);
-            do {
-              id(cursor) = (id(cursor) - 1 + choices) % choices;  // signed modulo is undefined
-            } while (id(kConfigCurrentRanges).state == 0 && id(cursor) == 3);  // skip range if not available
+            id(cursor) = (id(cursor) - 1 + choices) % choices;  // signed modulo is undefined
   - platform: gpio
     name: "${name} Dir Down"
     internal: true
@@ -779,9 +849,7 @@ binary_sensor:
     on_click:
     - then:
         - lambda: |-
-            do {
-              id(cursor) = (id(cursor) + 1) % (sizeof(id(cursorDigit)) / sizeof(id(cursorDigit)[0]));
-            } while (id(kConfigCurrentRanges).state == 0 && id(cursor) == 3);  // skip range if not available
+            id(cursor) = (id(cursor) + 1) % (sizeof(id(cursorDigit)) / sizeof(id(cursorDigit)[0]));
   - platform: gpio
     name: "${name} Dir Left"
     internal: true
@@ -869,10 +937,12 @@ sensor:
           static int8_t lastRange = -1;  // -1=off, 0=range0, 1=...
           int8_t thisRange = -1;
           static bool lastSampleValid = true;
-          if (id(range0)->state && !id(range1)->state) {
+          if (id(range0)->state && !id(range1)->state && !id(range2)->state) {
             thisRange = 0;
-          } else if (id(range1)->state && !id(range0)->state) {
+          } else if (id(range1)->state && !id(range0)->state && !id(range2)->state) {
             thisRange = 1;
+          } else if (id(range2)->state && !id(range0)->state && !id(range1)->state) {
+            thisRange = 2;
           }
           id(adc_current).publish_state(id(meas_current).rawValue);
 
@@ -891,6 +961,8 @@ sensor:
             value = value * id(kCurrentRatio0) * id(kCalCurrent0Factor).state + id(kCalCurrent0Offset).state;
           } else if (thisRange == 1) {
             value = value * id(kCurrentRatio1) * id(kCalCurrent1Factor).state + id(kCalCurrent1Offset).state;
+          } else if (thisRange == 2) {
+            value = value * id(kCurrentRatio2) * id(kCalCurrent2Factor).state + id(kCalCurrent2Offset).state;
           }
           lastSampleValid = true;
           return value;
@@ -995,8 +1067,7 @@ sensor:
     attenuation: auto
     filters:
       - multiply: 14
- 
- # TODO re-enable once chips added
+
   - platform: tmp1075n
     id: temp_fets
     address: 0x48
