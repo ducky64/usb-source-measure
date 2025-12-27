@@ -23,6 +23,8 @@ esphome:
     - switch.turn_on: conv_enable
     - delay: 0.1s
     - switch.turn_off: conv_enable
+    - delay: 1.0s  # assume enough time for PD to negotiate
+    - switch.turn_on: vin_ramp
   on_loop:
     - script.execute: buckboost_control_loop
   includes:
@@ -177,6 +179,7 @@ script:
         float correctedX = (setVoltage - id(kCalSetVoltageOffset).state) / id(kCalSetVoltageFactor).state;
         float targetVolts = id(kVCenter) - (correctedX / id(kVoltageRatio));
         id(dac_voltage)->write_state(targetVolts / id(kVref));
+        id(dac_voltage_fine)->write_state(targetVolts / id(kVref));
 
 light:
   - platform: status_led
@@ -186,15 +189,6 @@ light:
     pin:
       number: GPIO0
       inverted: true
-  # - platform: neopixelbus  # library seems broken
-  #   id: npx
-  #   variant: sk6812
-  #   pin: GPIO38
-  #   num_leds: 6
-  #   name: "${name} Neopixels"
-  #   effects:
-  #     - addressable_rainbow:
-  #         name: Rainbow
   - platform: esp32_rmt_led_strip
     id: npx
     rmt_channel: 0
@@ -228,6 +222,10 @@ output:
     mcp4728_id: dac_control
     channel: 0
   - platform: mcp4728
+    id: dac_voltage_fine
+    mcp4728_id: dac_control
+    channel: 2
+  - platform: mcp4728
     id: dac_isink
     mcp4728_id: dac_control
     channel: 1
@@ -257,6 +255,15 @@ switch:
     pin:
       pca9554: ioe_ctl
       number: 0
+    on_turn_on:
+      then:
+        - delay: 100ms
+        - lambda: |-
+            ESP_LOGI("top", "re-initializing ADC and DAC");
+            id(adc_meas).status_clear_error();
+            id(adc_meas).setup();
+            id(dac_control).status_clear_error();
+            id(dac_control).setup();
 
   - platform: gpio
     id: control_enable  # integrator analog switch
@@ -265,6 +272,7 @@ switch:
     pin:
       pca9554: ioe_ctl
       number: 4
+    inverted: true  # active-low enable
   - platform: gpio
     id: conv_enable
     # internal: true
@@ -429,8 +437,7 @@ display:
         case UsbPdStateMachine::kConnected: pdState = "PD"; break;
         default: pdState = "  ";
       }
-      // TODO re-enable once temp sensors mounted
-      // it.printf(128 - 4, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.f,%2.fc", pdState, id(fusb_vbus).get_state(), id(temp_buckboost).state, id(temp_fets).state);
+      it.printf(128 - 4, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.f,%2.fc", pdState, id(fusb_vbus).get_state(), id(temp_buckboost).state, id(temp_fets).state);
       if (millis() % 1000 >= 500) {
         it.print(128, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, ".");  // liveness indicator
       }
@@ -725,7 +732,7 @@ binary_sensor:
   - platform: gpio
     id: dir_sw
     name: "${name} Dir Sw"
-    # internal: true
+    internal: true
     pin: 
       pca9554: ioe_ui
       number: 1
@@ -742,7 +749,7 @@ binary_sensor:
             }
   - platform: gpio
     name: "${name} Dir Up"
-    # internal: true
+    internal: true
     pin: 
       pca9554: ioe_ui
       number: 0
@@ -760,7 +767,7 @@ binary_sensor:
             } while (id(kConfigCurrentRanges).state == 0 && id(cursor) == 3);  // skip range if not available
   - platform: gpio
     name: "${name} Dir Down"
-    # internal: true
+    internal: true
     pin: 
       pca9554: ioe_ui
       number: 3
@@ -777,7 +784,7 @@ binary_sensor:
             } while (id(kConfigCurrentRanges).state == 0 && id(cursor) == 3);  // skip range if not available
   - platform: gpio
     name: "${name} Dir Left"
-    # internal: true
+    internal: true
     pin: 
       pca9554: ioe_ui
       number: 2
@@ -800,7 +807,7 @@ binary_sensor:
             }
   - platform: gpio
     name: "${name} Dir Right"
-    # internal: true
+    internal: true
     pin: 
       pca9554: ioe_ui
       number: 7
@@ -990,16 +997,16 @@ sensor:
       - multiply: 14
  
  # TODO re-enable once chips added
-  # - platform: tmp1075n
-  #   id: temp_fets
-  #   address: 0x48
-  #   name: "${name} Temp FETs"
-  #   update_interval: 1s
-  # - platform: tmp1075n
-  #   id: temp_buckboost
-  #   address: 0x49
-  #   name: "${name} Temp Buck-boost"
-  #   update_interval: 1s
+  - platform: tmp1075n
+    id: temp_fets
+    address: 0x48
+    name: "${name} Temp FETs"
+    update_interval: 1s
+  - platform: tmp1075n
+    id: temp_buckboost
+    address: 0x49
+    name: "${name} Temp Buck-boost"
+    update_interval: 1s
 
   - platform: ina219
     address: 0x40
