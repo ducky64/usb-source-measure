@@ -31,9 +31,13 @@ light:
           lambda: |-
             it.all() = Color(0, 0, 0, 0);
 
-            switch (id(usbpd).get_state()) {
-              case UsbPdStateMachine::kConnected: it[5] = Color(0, 255, 0, 0); break;
-              default: it[5] = Color(255, 255, 0, 0);
+            if (!id(conv_en_sense).state) {  // OVP trip makes input LED go red
+              it[5] = Color(255, 0, 0, 0);
+            } else {  // otherwuse USB-PD state
+              switch (id(usbpd).get_state()) {
+                case UsbPdStateMachine::kConnected: it[5] = Color(0, 255, 0, 0); break;
+                default: it[5] = Color(255, 255, 0, 0);
+              }
             }
 
             if (id(enable).state) {

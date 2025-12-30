@@ -81,13 +81,13 @@ globals:
     initial_value: '21.1'  # 1/(0.0426 (divider) * 1.11 (diffamp))
   - id: kCurrentRatio0  # output amps per ADC volt, including accounting for resistor value
     type: float
-    initial_value: '1.02'  # 1/(0.1 (resistor) * 9.82 (diffamp))
+    initial_value: '1.95'  # 1/(0.1 (resistor) * 5.12 (diffamp))
   - id: kCurrentRatio1
     type: float
-    initial_value: '0.102'  # 1/(1 (resistor) * 9.82 (diffamp))
+    initial_value: '0.195'  # 1/(1 (resistor) * 5.12 (diffamp))
   - id: kCurrentRatio2
     type: float
-    initial_value: '0.0102'  # 1/(10 (resistor) * 9.82 (diffamp))
+    initial_value: '0.0195'  # 1/(10 (resistor) * 5.12 (diffamp))
   - id: kVCenter
     type: float
     initial_value: '1.65'  # theoretical
@@ -245,7 +245,7 @@ switch:
 
   - platform: gpio
     id: vin_ramp
-    # internal: true
+    internal: true
     name: "${name} Vin Ramp"
     pin:
       pca9554: ioe_ctl
@@ -261,9 +261,9 @@ switch:
             id(dac_control).setup();
 
   - platform: gpio
-    id: control_enable  # integrator analog switch
+    id: control_enable
     internal: true
-    name: "${name} Control Enable"
+    name: "${name} Integrator Control Enable"
     pin:
       pca9554: ioe_ctl
       number: 4
@@ -275,7 +275,6 @@ switch:
     pin:
       pca9554: ioe_ctl
       number: 2
-    inverted: true  # active-low enable
 
 
   - platform: gpio
