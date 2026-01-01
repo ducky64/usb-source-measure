@@ -16,8 +16,10 @@ void SampleBuffer::handleRequest(AsyncWebServerRequest *req) {
   AsyncResponseStream *stream = req->beginResponseStream("text/plain; version=0.0.4; charset=utf-8");
 
   if (req->hasArg("start")) {  // only return samples if the start index is provided
-    int start = req->arg("start").toInt();
-    if (start < 0) {  // buffer underrun
+    char* endptr;
+    long start = std::strtol(req->arg("start").c_str(), &endptr, 10);
+    
+    if (*endptr != '\0' || start < 0) {  // buffer underrun or invalid conversion
       req->send(stream);
       return;
     }
@@ -55,7 +57,7 @@ void SampleBuffer::write_sample(AsyncResponseStream *stream, SampleRecord& sampl
   stream->print(",");
   stream->print(names_[sample.sourceIndex].c_str());
   stream->print(",");
-  stream->print(sample.value, sample.accuracyDecimals);
+  stream->print(sample.value);
   stream->print("\n");
 }
 

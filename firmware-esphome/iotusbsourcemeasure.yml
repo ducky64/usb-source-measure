@@ -104,7 +104,7 @@ script:
 
         static auto lastRun = millis();
         auto thisRun = millis();
-        auto deltaMillis = min(thisRun - lastRun, (unsigned int)kMaxDeltaMillis);
+        auto deltaMillis = min(thisRun - lastRun, (unsigned long)kMaxDeltaMillis);
         if (id(enable).state) {  // only write the buck-boost if target is enable
           // set buck-boost to minimum needed + headroom
           float voltageScalingFactor = max(5.0, (id(fusb_vbus).state - 0.4));  // ratio to output volts = Vin, always expect at least 5
@@ -128,17 +128,17 @@ script:
     then:
     - lambda: |-
         float setCurrentFactor = 1, setCurrentOffset = 0;
-        if (id(current_range).state == "3A") {
+        if (id(current_range).current_option() == "3A") {
           setCurrentFactor = id(kCalSetCurrent0Factor).state * id(kCurrentRatio0);
           setCurrentOffset = id(kCalSetCurrent0Offset).state;
-        } else if (id(current_range).state == "300mA") {
+        } else if (id(current_range).current_option() == "300mA") {
           setCurrentFactor = id(kCalSetCurrent1Factor).state * id(kCurrentRatio1);
           setCurrentOffset = id(kCalSetCurrent1Offset).state;
-        } else if (id(current_range).state == "30mA") {
+        } else if (id(current_range).current_option() == "30mA") {
           setCurrentFactor = id(kCalSetCurrent2Factor).state * id(kCurrentRatio2);
           setCurrentOffset = id(kCalSetCurrent2Offset).state;
         } else {
-          ESP_LOGE("update_current", "Unknown range %s", id(current_range).state);
+          ESP_LOGE("update_current", "Unknown range %s", id(current_range).current_option());
         }
 
         float limitMinVolts = id(kVCenter) - ((id(limit_current_min).state - setCurrentOffset) / setCurrentFactor);
@@ -153,26 +153,26 @@ script:
     - script.execute: update_current
     - lambda: |-
         if (id(enable).state) {  // turn on, figure out ranging
-          if (id(current_range).state == "3A") {
+          if (id(current_range).current_option() == "3A") {
             id(range0).turn_on();
             if (!overlap) {
               id(range1).turn_off();
               id(range2).turn_off();
             }
-          } else if (id(current_range).state == "300mA") {
+          } else if (id(current_range).current_option() == "300mA") {
             id(range1).turn_on();
             if (!overlap) {
               id(range0).turn_off();
               id(range2).turn_off();
             }
-          } else if (id(current_range).state == "30mA") {
+          } else if (id(current_range).current_option() == "30mA") {
             id(range2).turn_on();
             if (!overlap) {
               id(range0).turn_off();
               id(range1).turn_off();
             }
           } else {
-            ESP_LOGE("set_enable_range", "Unknown range %s", id(current_range).state);
+            ESP_LOGE("set_enable_range", "Unknown range %s", id(current_range).current_option());
             return;
           }
           id(control_enable).turn_on();

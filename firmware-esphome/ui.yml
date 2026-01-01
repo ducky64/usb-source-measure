@@ -14,7 +14,6 @@ globals:
 light:
   - platform: esp32_rmt_led_strip
     id: npx
-    rmt_channel: 0
     rgb_order: GRB
     chipset: SK6812
     pin: GPIO38
@@ -101,7 +100,7 @@ display:
       drawValue(it, voltageX, measureY, id(bdf6x10), 2, 3, id(meas_voltage).get_state());
       it.print(voltageUnitsX, measureY + unitsOffsY, id(bdf4x6), "V");
       int currentDigitsDecimal = 4;
-      if (id(current_range).state == "300mA" || id(current_range).state == "30mA") {
+      if (id(current_range).current_option() == "300mA" || id(current_range).current_option() == "30mA") {
         currentDigitsDecimal = 5;
       }
       drawValue(it, currentX, measureY, id(bdf6x10), 1, currentDigitsDecimal, id(meas_current).get_state());
@@ -125,7 +124,7 @@ display:
       it.print(voltageUnitsX, setY + unitsOffsY, id(bdf4x6), "V");
 
       currentDigitsDecimal = 2;
-      if (id(current_range).state == "300mA" || id(current_range).state == "30mA") {
+      if (id(current_range).current_option() == "300mA" || id(current_range).current_option() == "30mA") {
         currentDigitsDecimal = 3;
       }
       drawValue(it, currentX, setY, id(bdf6x10), 1, currentDigitsDecimal, id(limit_current_max).state, id(cursor) == 1 ? id(cursorDigit)[1] : -128);
@@ -135,9 +134,9 @@ display:
       it.print(currentUnitsX, setY + 10 + unitsOffsY, id(bdf4x6), "A");
 
       if (id(cursor) == 3) {
-        drawInverted(it, voltageUnitsX - 8, setY + 10, id(bdf6x10), TextAlign::TOP_RIGHT, id(current_range).state.c_str());
+        drawInverted(it, voltageUnitsX - 8, setY + 10, id(bdf6x10), TextAlign::TOP_RIGHT, id(current_range).current_option());
       } else {
-        it.print(voltageUnitsX - 8, setY + 10, id(bdf6x10), TextAlign::TOP_RIGHT, id(current_range).state.c_str());
+        it.print(voltageUnitsX - 8, setY + 10, id(bdf6x10), TextAlign::TOP_RIGHT, id(current_range).current_option());
       }
       it.print(voltageUnitsX - 8, setY + 10 + unitsOffsY, id(bdf4x6), "Rng");
 
