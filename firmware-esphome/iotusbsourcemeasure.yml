@@ -37,6 +37,7 @@ esphome:
     - script.execute: buckboost_control_loop
   includes:
     - smu_display.h
+    - bits2value.h
 
 preferences:
   flash_write_interval: 5s  # so calibration updates save near-immediately
@@ -79,6 +80,9 @@ globals:
   - id: kVoltageRatio  # output volts per ADC volt
     type: float
     initial_value: '21.1'  # 1/(0.0426 (divider) * 1.11 (diffamp))
+  - id: kVoltageRatioFine  # output volts per ADC volt
+    type: float
+    initial_value: '0.0211'  # 1/1000th of the voltage ratio
   - id: kCurrentRatio0  # output amps per ADC volt, including accounting for resistor value
     type: float
     initial_value: '1.95'  # 1/(0.1 (resistor) * 5.12 (diffamp))
@@ -88,12 +92,6 @@ globals:
   - id: kCurrentRatio2
     type: float
     initial_value: '0.0195'  # 1/(10 (resistor) * 5.12 (diffamp))
-  - id: kVCenter
-    type: float
-    initial_value: '1.65'  # theoretical
-  - id: kVref
-    type: float
-    initial_value: '3.3'  # theoretical, 2% tolerance
 
 script:
   - id: buckboost_control_loop
@@ -141,11 +139,13 @@ script:
           ESP_LOGE("update_current", "Unknown range %s", id(current_range).current_option());
         }
 
-        float limitMinVolts = id(kVCenter) - ((id(limit_current_min).state - setCurrentOffset) / setCurrentFactor);
-        id(dac_isink)->write_state(limitMinVolts / id(kVref));
+        id(dac_isink)->write_state(
+          0.5 - valueToAdc(id(limit_current_min).state, setCurrentFactor, 1.0, setCurrentOffset)
+        );
         id(dac_value_isink)->publish_state(id(dac_isink).rawValue);
-        float limitMaxVolts = id(kVCenter) - ((id(limit_current_max).state - setCurrentOffset) / setCurrentFactor);
-        id(dac_isrc)->write_state(limitMaxVolts / id(kVref));
+        id(dac_isrc)->write_state(
+          0.5 - valueToAdc(id(limit_current_max).state, setCurrentFactor, 1.0, setCurrentOffset)
+        );
         id(dac_value_isrc)->publish_state(id(dac_isrc).rawValue);
 
   - id: set_enable_range  # sets the overall enable and current ranging IOs, based on the ranging and enable target
@@ -192,17 +192,18 @@ script:
   - id: update_voltage  # update the voltage
     then:
     - lambda: |-
-        float setVoltage = id(set_voltage).state;
-        float correctedX = (setVoltage - id(kCalSetVoltageOffset).state) / id(kCalSetVoltageFactor).state;
-        float targetVolts = id(kVCenter) - (correctedX / id(kVoltageRatio));
-        id(dac_voltage)->write_state(targetVolts / id(kVref));
-        id(dac_value_voltage)->publish_state(id(dac_voltage).rawValue);
-        id(actual_set_voltage)->publish_state(
-          (id(kVCenter) - (id(dac_voltage).rawValue / 4095.0 * id(kVref))) * id(kVoltageRatio) * id(kCalSetVoltageFactor).state
-          + id(kCalSetVoltageOffset).state
+        id(dac_voltage)->write_state(
+          0.5 - valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state)
         );
-        id(dac_voltage_fine)->write_state(targetVolts / id(kVref));
+        id(dac_voltage_fine)->write_state(  // TODO handle fine scaling
+          0.5 - valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state)
+        );
+        id(dac_value_voltage)->publish_state(id(dac_voltage).rawValue);
         id(dac_value_voltage_fine)->publish_state(id(dac_voltage_fine).rawValue);
+        id(actual_set_voltage)->publish_state(
+          adcToValue(0.5 - id(dac_voltage).rawValue / 4095.0, 
+            id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state)
+        );
 
 output:
   - platform: mcpwm_sync
@@ -520,7 +521,7 @@ sensor:
     filters:
       - lambda: |-
           id(adc_voltage).publish_state(id(meas_voltage).rawValue);
-          return x * id(kVref) * id(kVoltageRatio) * id(kCalVoltageFactor).state + id(kCalVoltageOffset).state;
+          return adcToValue(x, id(kVoltageRatio), id(kCalVoltageFactor).state, id(kCalVoltageOffset).state);
   - platform: mcp3561
     id: meas_current
     name: "${name} Meas Current"
@@ -553,13 +554,13 @@ sensor:
             }
           }
 
-          auto value = x * id(kVref);
+          float value;
           if (thisRange == 0) {
-            value = value * id(kCurrentRatio0) * id(kCalCurrent0Factor).state + id(kCalCurrent0Offset).state;
+            value = adcToValue(x, id(kCurrentRatio0), id(kCalCurrent0Factor).state, id(kCalCurrent0Offset).state);
           } else if (thisRange == 1) {
-            value = value * id(kCurrentRatio1) * id(kCalCurrent1Factor).state + id(kCalCurrent1Offset).state;
+            value = adcToValue(x, id(kCurrentRatio1), id(kCalCurrent1Factor).state, id(kCalCurrent1Offset).state);
           } else if (thisRange == 2) {
-            value = value * id(kCurrentRatio2) * id(kCalCurrent2Factor).state + id(kCalCurrent2Offset).state;
+            value = adcToValue(x, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
           }
           lastSampleValid = true;
           return value;
