@@ -73,12 +73,21 @@ light:
       number: GPIO0
       inverted: true
 
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      id: wifi_ip
+      internal: true
+    ssid:
+      id: wifi_ssid
+      internal: true
+
 font:
   - file: "resources/4x6.bdf"  # characters actually 3x5 plus 1px descender
     id: bdf4x6
   - file: "resources/6x10.bdf"  # characters actually 5x7 plus 2px descender
     id: bdf6x10
-    
+
 display:
   - platform: ssd1306_i2c
     model: "SSD1306 128x64"
@@ -149,9 +158,9 @@ display:
       }
 
       char wifiSsidTrunc[16] = {0};
-      strncpy(wifiSsidTrunc, WiFi.SSID().c_str(), 15);
+      strncpy(wifiSsidTrunc, id(wifi_ssid).state.c_str(), 15);
       it.print(0, 64-6, id(bdf4x6), TextAlign::BOTTOM_LEFT, wifiSsidTrunc);
-      it.print(0, 64, id(bdf4x6), TextAlign::BOTTOM_LEFT, WiFi.localIP().toString().c_str());
+      it.print(0, 64, id(bdf4x6), TextAlign::BOTTOM_LEFT, id(wifi_ip).state.c_str());
 
       it.printf(128, 64-6, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%sDucky SMU", uncal ? "-- UNCAL --  " : "");
 

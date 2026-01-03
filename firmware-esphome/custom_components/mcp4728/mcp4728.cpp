@@ -45,6 +45,7 @@ void MCP4728Output::write_state(float state) {
     data = 4095;
   }
   parent_->writeChannel(channel_, data, true);
+  this->rawValue = data;
 }
 
 }

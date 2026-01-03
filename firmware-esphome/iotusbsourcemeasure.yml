@@ -37,6 +37,7 @@ esphome:
     - script.execute: buckboost_control_loop
   includes:
     - smu_display.h
+    - bits2value.h
 
 preferences:
   flash_write_interval: 5s  # so calibration updates save near-immediately
@@ -79,6 +80,9 @@ globals:
   - id: kVoltageRatio  # output volts per ADC volt
     type: float
     initial_value: '21.1'  # 1/(0.0426 (divider) * 1.11 (diffamp))
+  - id: kVoltageFineRatio  # output volts per ADC volt
+    type: float
+    initial_value: '0.0211'  # 1/1000th of the voltage ratio
   - id: kCurrentRatio0  # output amps per ADC volt, including accounting for resistor value
     type: float
     initial_value: '1.95'  # 1/(0.1 (resistor) * 5.12 (diffamp))
@@ -88,12 +92,6 @@ globals:
   - id: kCurrentRatio2
     type: float
     initial_value: '0.0195'  # 1/(10 (resistor) * 5.12 (diffamp))
-  - id: kVCenter
-    type: float
-    initial_value: '1.65'  # theoretical
-  - id: kVref
-    type: float
-    initial_value: '3.3'  # theoretical, 2% tolerance
 
 script:
   - id: buckboost_control_loop
@@ -141,10 +139,21 @@ script:
           ESP_LOGE("update_current", "Unknown range %s", id(current_range).current_option());
         }
 
-        float limitMinVolts = id(kVCenter) - ((id(limit_current_min).state - setCurrentOffset) / setCurrentFactor);
-        id(dac_isink)->write_state(limitMinVolts / id(kVref));
-        float limitMaxVolts = id(kVCenter) - ((id(limit_current_max).state - setCurrentOffset) / setCurrentFactor);
-        id(dac_isrc)->write_state(limitMaxVolts / id(kVref));
+        id(dac_isink)->write_state(
+          0.5 - valueToAdc(id(limit_current_min).state, setCurrentFactor, 1.0, setCurrentOffset)
+        );
+        id(dac_value_isink)->publish_state(id(dac_isink).rawValue);
+        id(actual_limit_current_min)->publish_state(
+          adcToValue(0.5 - id(dac_isink).rawValue / 4095.0, setCurrentFactor, 1.0, setCurrentOffset)
+        );
+
+        id(dac_isrc)->write_state(
+          0.5 - valueToAdc(id(limit_current_max).state, setCurrentFactor, 1.0, setCurrentOffset)
+        );
+        id(dac_value_isrc)->publish_state(id(dac_isrc).rawValue);
+        id(actual_limit_current_max)->publish_state(
+          adcToValue(0.5 - id(dac_isrc).rawValue / 4095.0, setCurrentFactor, 1.0, setCurrentOffset)
+        );
 
   - id: set_enable_range  # sets the overall enable and current ranging IOs, based on the ranging and enable target
     parameters:
@@ -190,23 +199,31 @@ script:
   - id: update_voltage  # update the voltage
     then:
     - lambda: |-
-        float setVoltage = id(set_voltage).state;
-        float correctedX = (setVoltage - id(kCalSetVoltageOffset).state) / id(kCalSetVoltageFactor).state;
-        float targetVolts = id(kVCenter) - (correctedX / id(kVoltageRatio));
-        id(dac_voltage)->write_state(targetVolts / id(kVref));
-        id(dac_voltage_fine)->write_state(targetVolts / id(kVref));
+        // set the coarse voltage first
+        id(dac_voltage)->write_state(
+          0.5 - valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state)
+        );
+        id(dac_value_voltage)->publish_state(id(dac_voltage).rawValue);
+        // get the quantized voltage
+        float coarse_voltage = adcToValue(
+            0.5 - id(dac_voltage).rawValue / 4095.0, 
+            id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state);
+        id(actual_set_voltage)->publish_state(coarse_voltage);
+
+        // then use the fine control to set the remainder
+        id(actual_set_voltage_fine).make_call().set_value(id(set_voltage).state - coarse_voltage).perform();
 
 output:
   - platform: mcpwm_sync
     id: buck_pwm
     pin: GPIO17
-    frequency: 250kHz
+    frequency: 500kHz
     deadtime_rising: 0s  # deadtime generated internally by gate driver
     deadtime_falling: 0s
   - platform: mcpwm_sync
     id: boost_pwm
     pin: GPIO18  # this controls the HIGH SIDE switch, so the duty is 1-D
-    frequency: 250kHz
+    frequency: 500kHz
     deadtime_rising: 0s  # deadtime generated internally by gate driver
     deadtime_falling: 0s
     max_duty: 0.37  # up to 1.5x boost ratio, accounting for 0.95 buck ratio
@@ -417,6 +434,25 @@ number:
             ESP_LOGD("BuckBoostCtl", "Target %.02f, buck %.02f, boost %.02f", x, buckDc, boostDc);
             id(buckboost_ratio).publish_state(x);
 
+  - platform: template  # unlike the other actuals, this is inout to allow calibration to actuate independently
+    name: "${name} Set Voltage Fine Actual"
+    id: actual_set_voltage_fine
+    min_value: -0.1
+    max_value: 0.1
+    step: 0.0001
+    set_action:
+      - then:
+        - lambda: |-
+            id(dac_voltage_fine)->write_state(
+                0.5 - valueToAdc(x, id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, 0)
+            );
+
+            // then write back out the quantized value
+            id(actual_set_voltage_fine).publish_state(
+              adcToValue(0.5 - id(dac_voltage_fine).rawValue / 4095.0, 
+                id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, 0)
+            );
+
 select:
   - platform: template  # published state is the target range, current range is the state of the ranging GPIOs
     name: "${name} Set Current Range"
@@ -500,7 +536,7 @@ sensor:
     filters:
       - lambda: |-
           id(adc_voltage).publish_state(id(meas_voltage).rawValue);
-          return x * id(kVref) * id(kVoltageRatio) * id(kCalVoltageFactor).state + id(kCalVoltageOffset).state;
+          return adcToValue(x, id(kVoltageRatio), id(kCalVoltageFactor).state, id(kCalVoltageOffset).state);
   - platform: mcp3561
     id: meas_current
     name: "${name} Meas Current"
@@ -533,13 +569,13 @@ sensor:
             }
           }
 
-          auto value = x * id(kVref);
+          float value;
           if (thisRange == 0) {
-            value = value * id(kCurrentRatio0) * id(kCalCurrent0Factor).state + id(kCalCurrent0Offset).state;
+            value = adcToValue(x, id(kCurrentRatio0), id(kCalCurrent0Factor).state, id(kCalCurrent0Offset).state);
           } else if (thisRange == 1) {
-            value = value * id(kCurrentRatio1) * id(kCalCurrent1Factor).state + id(kCalCurrent1Offset).state;
+            value = adcToValue(x, id(kCurrentRatio1), id(kCalCurrent1Factor).state, id(kCalCurrent1Offset).state);
           } else if (thisRange == 2) {
-            value = value * id(kCurrentRatio2) * id(kCalCurrent2Factor).state + id(kCalCurrent2Offset).state;
+            value = adcToValue(x, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
           }
           lastSampleValid = true;
           return value;
@@ -634,6 +670,43 @@ sensor:
   #   filters:
   #     - lambda: |-
   #         return x * id(kVref);
+
+  - platform: template  # these are the raw DAC counts
+    name: "${name} DAC Voltage"
+    id: dac_value_voltage
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    name: "${name} DAC Voltage Fine"
+    id: dac_value_voltage_fine
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    name: "${name} DAC Current Source Limit"
+    id: dac_value_isrc
+    accuracy_decimals: 0
+    internal: true
+  - platform: template
+    name: "${name} DAC Current Sink Limit"
+    id: dac_value_isink
+    accuracy_decimals: 0
+    internal: true
+
+  - platform: template  # these are the setpoint values after quantization and calibration
+    name: "${name} Set Voltage Actual"
+    id: actual_set_voltage
+    accuracy_decimals: 4
+    internal: true
+  - platform: template
+    name: "${name} Set Current Min Actual"
+    id: actual_limit_current_min
+    accuracy_decimals: 5
+    internal: true
+  - platform: template
+    name: "${name} Set Current Max Actual"
+    id: actual_limit_current_max
+    accuracy_decimals: 5
+    internal: true
 
   - platform: adc
     id: adc_vconv

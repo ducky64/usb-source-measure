@@ -44,6 +44,8 @@ class MCP4728Output : public output::FloatOutput,
 
   void write_state(float state) override;
 
+  uint16_t rawValue{0};
+
  protected:
   uint8_t channel_;
 };

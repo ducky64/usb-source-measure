@@ -48,6 +48,18 @@ number:
     set_action:
       - then:
         - lambda: id(kCalSetVoltageOffset).publish_state(x);
+  - platform: template
+    name: "${name} Cal Voltage Fine Set Factor"
+    internal: true
+    id: kCalSetVoltageFineFactor
+    min_value: 0
+    max_value: 2
+    step: 0.0001
+    initial_value: 1
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalSetVoltageFineFactor).publish_state(x);
 
   - platform: template
     name: "${name} Cal Current0 Meas Factor"  # multiply measured amps by this to get true amps
