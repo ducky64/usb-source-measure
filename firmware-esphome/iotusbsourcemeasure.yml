@@ -142,9 +142,11 @@ script:
         }
 
         float limitMinVolts = id(kVCenter) - ((id(limit_current_min).state - setCurrentOffset) / setCurrentFactor);
-        id(dac_set_isink).make_call().set_value(limitMinVolts / id(kVref)).perform();
+        id(dac_isink)->write_state(limitMinVolts / id(kVref));
+        id(dac_value_isink)->publish_state(id(dac_isink).rawValue);
         float limitMaxVolts = id(kVCenter) - ((id(limit_current_max).state - setCurrentOffset) / setCurrentFactor);
-        id(dac_set_isrc).make_call().set_value(limitMaxVolts / id(kVref)).perform();
+        id(dac_isrc)->write_state(limitMaxVolts / id(kVref));
+        id(dac_value_isrc)->publish_state(id(dac_isrc).rawValue);
 
   - id: set_enable_range  # sets the overall enable and current ranging IOs, based on the ranging and enable target
     parameters:
@@ -193,8 +195,14 @@ script:
         float setVoltage = id(set_voltage).state;
         float correctedX = (setVoltage - id(kCalSetVoltageOffset).state) / id(kCalSetVoltageFactor).state;
         float targetVolts = id(kVCenter) - (correctedX / id(kVoltageRatio));
-        id(dac_set_voltage).make_call().set_value(targetVolts / id(kVref)).perform();
-        id(dac_set_voltage_fine).make_call().set_value(targetVolts / id(kVref)).perform();
+        id(dac_voltage)->write_state(targetVolts / id(kVref));
+        id(dac_value_voltage)->publish_state(id(dac_voltage).rawValue);
+        id(actual_set_voltage)->publish_state(
+          (id(kVCenter) - (id(dac_voltage).rawValue / 4095.0 * id(kVref))) * id(kVoltageRatio) * id(kCalSetVoltageFactor).state
+          + id(kCalSetVoltageOffset).state
+        );
+        id(dac_voltage_fine)->write_state(targetVolts / id(kVref));
+        id(dac_value_voltage_fine)->publish_state(id(dac_voltage_fine).rawValue);
 
 output:
   - platform: mcpwm_sync
@@ -417,55 +425,17 @@ number:
             ESP_LOGD("BuckBoostCtl", "Target %.02f, buck %.02f, boost %.02f", x, buckDc, boostDc);
             id(buckboost_ratio).publish_state(x);
 
-
-  - platform: template
-    name: "${name} DAC Voltage"
-    id: dac_set_voltage
+  - platform: template  # unlike the other actuals, this is an inout to allow for calibration
+    name: "${name} Set Voltage Fine Actual"
+    id: actual_set_voltage_fine
     min_value: 0
-    max_value: 1
-    step: 0.0001
-    # internal: true
-    set_action:
-      - then:
-        - lambda: |-  # set the underlying DAC and write back the quantized ratio
-            id(dac_voltage)->write_state(x);
-            id(dac_set_voltage)->publish_state(id(dac_voltage).rawValue / 4095.0);
-  - platform: template
-    name: "${name} DAC Voltage Fine"
-    id: dac_set_voltage_fine
-    min_value: 0
-    max_value: 1
-    step: 0.0001
-    # internal: true
+    max_value: 30
+    step: 0.00001
     set_action:
       - then:
         - lambda: |-
-            id(dac_voltage_fine)->write_state(x);
-            id(dac_set_voltage_fine)->publish_state(id(dac_voltage_fine).rawValue / 4095.0);
-  - platform: template
-    name: "${name} DAC Current Source Limit"
-    id: dac_set_isrc
-    min_value: 0
-    max_value: 1
-    step: 0.0001
-    # internal: true
-    set_action:
-      - then:
-        - lambda: |-
-            id(dac_isrc)->write_state(x);
-            id(dac_set_isrc)->publish_state(id(dac_isrc).rawValue / 4095.0);
-  - platform: template
-    name: "${name} DAC Current Sink Limit"
-    id: dac_set_isink
-    min_value: 0
-    max_value: 1
-    step: 0.0001
-    internal: true
-    set_action:
-      - then:
-        - lambda: |-
-            id(dac_isink)->write_state(x);
-            id(dac_set_isink)->publish_state(id(dac_isink).rawValue / 4095.0);
+            id(actual_set_voltage_fine).publish_state(x);
+            //id(dac_voltage_fine)->write_state(targetVolts / id(kVref));
 
 select:
   - platform: template  # published state is the target range, current range is the state of the ranging GPIOs
@@ -684,6 +654,43 @@ sensor:
   #   filters:
   #     - lambda: |-
   #         return x * id(kVref);
+
+  - platform: template  # these are the raw DAC counts
+    name: "${name} DAC Voltage"
+    id: dac_value_voltage
+    accuracy_decimals: 0
+    # internal: true
+  - platform: template
+    name: "${name} DAC Voltage Fine"
+    id: dac_value_voltage_fine
+    accuracy_decimals: 0
+    # internal: true
+  - platform: template
+    name: "${name} DAC Current Source Limit"
+    id: dac_value_isrc
+    accuracy_decimals: 0
+    # internal: true
+  - platform: template
+    name: "${name} DAC Current Sink Limit"
+    id: dac_value_isink
+    accuracy_decimals: 0
+    # internal: true
+
+  - platform: template  # these are the setpoint values after quantization and calibration
+    name: "${name} Set Voltage Actual"
+    id: actual_set_voltage
+    accuracy_decimals: 4
+    # internal: true
+  - platform: template
+    name: "${name} Set Current Min Actual"
+    id: actual_limit_current_min
+    accuracy_decimals: 0
+    # internal: true
+  - platform: template
+    name: "${name} Set Current Max Actual"
+    id: actual_minit_current_max
+    accuracy_decimals: 0
+    # internal: true
 
   - platform: adc
     id: adc_vconv
