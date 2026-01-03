@@ -1,21 +1,18 @@
 import argparse
 import sys
 import time
-import csv
 from decimal import Decimal
 from typing import Tuple, List
 
 import numpy as np
-import numpy.linalg
 
 from SmuInterface import SmuInterface
-from cal_util import regress
 
 
 kLimitCurrentMax = 0.05
 kLimitCurrentMin = -0.05
 # kVoltageCalPoints = [1, 2, 4, 8, 12, 16, 20]
-kVoltageCalPoints = [1, 3, 6]
+kVoltageCalPoints = [0.5, 1, 2, 4, 6]
 # kVoltageCalFinePoints = [-0.025, -0.015, 0, 0.015, 0.025]
 kVoltageCalFinePoints = [-0.025, 0, 0.025]
 
