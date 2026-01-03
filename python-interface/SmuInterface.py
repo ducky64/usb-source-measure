@@ -137,15 +137,13 @@ class SmuInterface:
     self._set('number', self.kNameCalVoltageSetFactor, factor)
     self._set('number', self.kNameCalVoltageSetOffset, offset)
 
-  def cal_get_voltage_fine_set(self) -> Tuple[decimal.Decimal, decimal.Decimal]:
-    """Returns the voltage fine set calibration, factor and offset terms"""
-    return (self._get('number', self.kNameCalVoltageFineSetFactor, read_value=True),
-            self._get('number', self.kNameCalVoltageFineSetOffset, read_value=True))
+  def cal_get_voltage_fine_set(self) -> decimal.Decimal:
+    """Returns the voltage fine set calibration, factor term (offset rolled into coarse cal)"""
+    return self._get('number', self.kNameCalVoltageFineSetFactor, read_value=True)
 
-  def cal_set_voltage_fine_set(self, factor: float, offset: float) -> None:
-    """Sets the voltage fine set calibration, factor and offset terms"""
+  def cal_set_voltage_fine_set(self, factor: float) -> None:
+    """Sets the voltage fine set calibration, factor term"""
     self._set('number', self.kNameCalVoltageFineSetFactor, factor)
-    self._set('number', self.kNameCalVoltageFineSetOffset, offset)
 
   def cal_get_current_meas(self, irange: int) -> Tuple[decimal.Decimal, decimal.Decimal]:
     return (self._get('number', self.kNameCalCurrentMeasFactor[irange], read_value=True),
