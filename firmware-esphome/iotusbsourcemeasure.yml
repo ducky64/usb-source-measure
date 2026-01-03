@@ -446,8 +446,7 @@ number:
             id(dac_voltage_fine)->write_state(
                 0.5 - valueToAdc(x, id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, id(kCalSetVoltageFineOffset).state)
             );
-            float sp = 0.5 - valueToAdc(x, id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, id(kCalSetVoltageFineOffset).state);
-            ESP_LOGI("top", "fine remainder = %.04f,  setpoint = %.04f", x, sp);
+
             // then write back out the quantized value
             id(actual_set_voltage_fine).publish_state(
               adcToValue(0.5 - id(dac_voltage_fine).rawValue / 4095.0, 

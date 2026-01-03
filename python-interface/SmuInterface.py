@@ -8,37 +8,38 @@ class SmuInterface:
 
   kNameMacWifi = 'Mac Wifi'
 
-  kNameConfigCurrentRanges = 'Config Current Ranges'
-
   kNameMeasCurrent = 'Meas Current'
   kNameMeasVoltage = 'Meas Voltage'
-  kNameAdcCurrent = 'Meas ADC Current'
-  kNameAdcVoltage = 'Meas ADC Voltage'
   kNameDerivPower = 'Deriv Power'
   kNameDerivEnergy = 'Deriv Energy'
-  kNameDacVoltage = 'DAC Voltage'
-  kNameDacVoltageFine = 'DAC Voltage Fine'
-  kNameDacCurrentSink = 'DAC Current Source Limit'
-  kNameDacCurrentSource = 'DAC Current Sink Limit'
 
   kNameSetCurrentMin = 'Set Current Min'
   kNameSetCurrentMax = 'Set Current Max'
   kNameSetVoltage = 'Set Voltage'
-  kNameEnableRange = ['Range0', 'Range1']
+  kNameActualSetVoltage = 'Set Voltage Actual'
+  kNameActualSetVoltageFine = 'Set Voltage Fine Actual'
+  kNameActualSetCurrentMin = 'Set Current Min Actual'
+  kNameActualSetCurrentMax = 'Set Current Max Actual'
+
+  kNameEnable = "Enable"
+  kNameCurrentRange = "Set Current Range"
 
   kNameCalVoltageMeasFactor = 'Cal Voltage Meas Factor'
   kNameCalVoltageMeasOffset = 'Cal Voltage Meas Offset'
   kNameCalVoltageSetFactor = 'Cal Voltage Set Factor'
   kNameCalVoltageSetOffset = 'Cal Voltage Set Offset'
+  kNameCalVoltageFineSetFactor = 'Cal Voltage Fine Set Factor'
+  kNameCalVoltageFineSetOffset = 'Cal Voltage Fine Set Offset'
 
-  kNameCalCurrentMeasFactor = ['Cal Current0 Meas Factor', 'Cal Current1 Meas Factor']
-  kNameCalCurrentMeasOffset = ['Cal Current0 Meas Offset', 'Cal Current1 Meas Offset']
-  kNameCalCurrentSetFactor = ['Cal Current0 Set Factor', 'Cal Current1 Set Factor']
-  kNameCalCurrentSetOffset = ['Cal Current0 Set Offset', 'Cal Current1 Set Offset']
+  kNameCalCurrentMeasFactor = ['Cal Current0 Meas Factor', 'Cal Current1 Meas Factor', 'Cal Current2 Meas Factor']
+  kNameCalCurrentMeasOffset = ['Cal Current0 Meas Offset', 'Cal Current1 Meas Offset', 'Cal Current2 Meas Offset']
+  kNameCalCurrentSetFactor = ['Cal Current0 Set Factor', 'Cal Current1 Set Factor', 'Cal Current2 Set Factor']
+  kNameCalCurrentSetOffset = ['Cal Current0 Set Offset', 'Cal Current1 Set Offset', 'Cal Current2 Set Offset']
 
   kNameAllCal = [
-    # kNameConfigCurrentRanges,
-    kNameCalVoltageMeasFactor, kNameCalVoltageMeasOffset, kNameCalVoltageSetFactor, kNameCalVoltageSetOffset,
+    kNameCalVoltageMeasFactor, kNameCalVoltageMeasOffset,
+    kNameCalVoltageSetFactor, kNameCalVoltageSetOffset,
+    kNameCalVoltageFineSetFactor, kNameCalVoltageFineSetOffset,
   ] + kNameCalCurrentMeasFactor + kNameCalCurrentMeasOffset + kNameCalCurrentSetFactor + kNameCalCurrentSetOffset
 
   def _webapi_name(self, name: str) -> str:
@@ -84,17 +85,12 @@ class SmuInterface:
     return (self._get('sensor', self.kNameMeasVoltage),
             self._get('sensor', self.kNameMeasCurrent))
 
-  def get_raw_voltage_current(self) -> Tuple[int, int]:
-    """Returns the voltage and current ADC counts"""
-    return (int(self._get('sensor', self.kNameAdcVoltage)),
-            int(self._get('sensor', self.kNameAdcCurrent)))
-
   def get_voltage_current_set(self) -> Tuple[decimal.Decimal, decimal.Decimal, decimal.Decimal, decimal.Decimal]:
-      """Returns the voltage (coarse, fine) and current (sink limit, source limit) as a DAC-quantized ratio"""
-      return (self._get('number', self.kNameDacVoltage),
-              self._get('number', self.kNameDacVoltageFine),
-              self._get('number', self.kNameDacCurrentSink),
-              self._get('number', self.kNameDacCurrentSource))
+      """Returns the voltage (coarse, fine) and current (sink limit, source limit) as a DAC-quantized target value"""
+      return (self._get('number', self.kNameActualSetVoltage),
+              self._get('number', self.kNameActualSetVoltageFine),
+              self._get('number', self.kNameActualSetCurrentMin),
+              self._get('number', self.kNameActualSetCurrentMax))
 
   def get_deriv_power(self) -> decimal.Decimal:
     """Returns the derived power in watts"""
@@ -104,21 +100,19 @@ class SmuInterface:
     """Returns the derived cumulative energy in joules"""
     return self._get('sensor', self.kNameDerivEnergy)
 
-  def enable(self, on: bool = True, irange: int = 0) -> None:
-    if on:
-      action = 'turn_on'
-      names = [self.kNameEnableRange[irange]]
-    else:
-      action = 'turn_off'
-      names = self.kNameEnableRange
-
-    for name in names:
-      resp = requests.post(f'http://{self.addr}/switch/{self._webapi_name(name)}/{action}')
+  def enable(self, on: bool = True, irange: Optional[str] = None) -> None:
+    if on and irange is not None:
+      resp = requests.post(f'http://{self.addr}/select/{self._webapi_name(self.kNameCurrentRange)}/set?option={irange}')
       if resp.status_code != 200:
         raise Exception(f'Request failed: {resp.status_code}')
 
-  def config_set_current_ranges(self, nranges: int) -> None:
-    self._set('number', self.kNameConfigCurrentRanges, nranges)
+    if on:
+      action = 'turn_on'
+    else:
+      action = 'turn_off'
+    resp = requests.post(f'http://{self.addr}/switch/{self._webapi_name(self.kNameEnable)}/{action}')
+    if resp.status_code != 200:
+      raise Exception(f'Request failed: {resp.status_code}')
 
   def cal_get_voltage_meas(self) -> Tuple[decimal.Decimal, decimal.Decimal]:
     """Returns the voltage measurement calibration, factor and offset terms"""
@@ -139,6 +133,16 @@ class SmuInterface:
     """Sets the voltage set calibration, factor and offset terms"""
     self._set('number', self.kNameCalVoltageSetFactor, factor)
     self._set('number', self.kNameCalVoltageSetOffset, offset)
+
+  def cal_get_voltage_fine_set(self) -> Tuple[decimal.Decimal, decimal.Decimal]:
+    """Returns the voltage fine set calibration, factor and offset terms"""
+    return (self._get('number', self.kNameCalVoltageFineSetFactor, read_value=True),
+            self._get('number', self.kNameCalVoltageFineSetOffset, read_value=True))
+
+  def cal_set_voltage_fine_set(self, factor: float, offset: float) -> None:
+    """Sets the voltage fine set calibration, factor and offset terms"""
+    self._set('number', self.kNameCalVoltageFineSetFactor, factor)
+    self._set('number', self.kNameCalVoltageFineSetOffset, offset)
 
   def cal_get_current_meas(self, irange: int) -> Tuple[decimal.Decimal, decimal.Decimal]:
     return (self._get('number', self.kNameCalCurrentMeasFactor[irange], read_value=True),
