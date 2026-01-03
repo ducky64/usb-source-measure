@@ -80,7 +80,7 @@ globals:
   - id: kVoltageRatio  # output volts per ADC volt
     type: float
     initial_value: '21.1'  # 1/(0.0426 (divider) * 1.11 (diffamp))
-  - id: kVoltageRatioFine  # output volts per ADC volt
+  - id: kVoltageFineRatio  # output volts per ADC volt
     type: float
     initial_value: '0.0211'  # 1/1000th of the voltage ratio
   - id: kCurrentRatio0  # output amps per ADC volt, including accounting for resistor value
@@ -143,10 +143,17 @@ script:
           0.5 - valueToAdc(id(limit_current_min).state, setCurrentFactor, 1.0, setCurrentOffset)
         );
         id(dac_value_isink)->publish_state(id(dac_isink).rawValue);
+        id(actual_limit_current_min)->publish_state(
+          adcToValue(0.5 - id(dac_isink).rawValue / 4095.0, setCurrentFactor, 1.0, setCurrentOffset)
+        );
+
         id(dac_isrc)->write_state(
           0.5 - valueToAdc(id(limit_current_max).state, setCurrentFactor, 1.0, setCurrentOffset)
         );
         id(dac_value_isrc)->publish_state(id(dac_isrc).rawValue);
+        id(actual_limit_current_max)->publish_state(
+          adcToValue(0.5 - id(dac_isrc).rawValue / 4095.0, setCurrentFactor, 1.0, setCurrentOffset)
+        );
 
   - id: set_enable_range  # sets the overall enable and current ranging IOs, based on the ranging and enable target
     parameters:
@@ -192,18 +199,19 @@ script:
   - id: update_voltage  # update the voltage
     then:
     - lambda: |-
+        // set the coarse voltage first
         id(dac_voltage)->write_state(
           0.5 - valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state)
         );
-        id(dac_voltage_fine)->write_state(  // TODO handle fine scaling
-          0.5 - valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state)
-        );
         id(dac_value_voltage)->publish_state(id(dac_voltage).rawValue);
-        id(dac_value_voltage_fine)->publish_state(id(dac_voltage_fine).rawValue);
-        id(actual_set_voltage)->publish_state(
-          adcToValue(0.5 - id(dac_voltage).rawValue / 4095.0, 
-            id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state)
-        );
+        // get the quantized voltage
+        float coarse_voltage = adcToValue(
+            0.5 - id(dac_voltage).rawValue / 4095.0, 
+            id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state);
+        id(actual_set_voltage)->publish_state(coarse_voltage);
+
+        // then use the fine control to set the remainder
+        id(actual_set_voltage_fine).make_call().set_value(id(set_voltage).state - coarse_voltage).perform();
 
 output:
   - platform: mcpwm_sync
@@ -426,17 +434,25 @@ number:
             ESP_LOGD("BuckBoostCtl", "Target %.02f, buck %.02f, boost %.02f", x, buckDc, boostDc);
             id(buckboost_ratio).publish_state(x);
 
-  - platform: template  # unlike the other actuals, this is an inout to allow for calibration
+  - platform: template  # unlike the other actuals, this is inout to allow calibration to actuate independently
     name: "${name} Set Voltage Fine Actual"
     id: actual_set_voltage_fine
-    min_value: 0
-    max_value: 30
-    step: 0.00001
+    min_value: -0.1
+    max_value: 0.1
+    step: 0.0001
     set_action:
       - then:
         - lambda: |-
-            id(actual_set_voltage_fine).publish_state(x);
-            //id(dac_voltage_fine)->write_state(targetVolts / id(kVref));
+            id(dac_voltage_fine)->write_state(
+                0.5 - valueToAdc(x, id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, id(kCalSetVoltageFineOffset).state)
+            );
+            float sp = 0.5 - valueToAdc(x, id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, id(kCalSetVoltageFineOffset).state);
+            ESP_LOGI("top", "fine remainder = %.04f,  setpoint = %.04f", x, sp);
+            // then write back out the quantized value
+            id(actual_set_voltage_fine).publish_state(
+              adcToValue(0.5 - id(dac_voltage_fine).rawValue / 4095.0, 
+                id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, id(kCalSetVoltageFineOffset).state)
+            );
 
 select:
   - platform: template  # published state is the target range, current range is the state of the ranging GPIOs
@@ -660,38 +676,38 @@ sensor:
     name: "${name} DAC Voltage"
     id: dac_value_voltage
     accuracy_decimals: 0
-    # internal: true
+    internal: true
   - platform: template
     name: "${name} DAC Voltage Fine"
     id: dac_value_voltage_fine
     accuracy_decimals: 0
-    # internal: true
+    internal: true
   - platform: template
     name: "${name} DAC Current Source Limit"
     id: dac_value_isrc
     accuracy_decimals: 0
-    # internal: true
+    internal: true
   - platform: template
     name: "${name} DAC Current Sink Limit"
     id: dac_value_isink
     accuracy_decimals: 0
-    # internal: true
+    internal: true
 
   - platform: template  # these are the setpoint values after quantization and calibration
     name: "${name} Set Voltage Actual"
     id: actual_set_voltage
     accuracy_decimals: 4
-    # internal: true
+    internal: true
   - platform: template
     name: "${name} Set Current Min Actual"
     id: actual_limit_current_min
-    accuracy_decimals: 0
-    # internal: true
+    accuracy_decimals: 5
+    internal: true
   - platform: template
     name: "${name} Set Current Max Actual"
-    id: actual_minit_current_max
-    accuracy_decimals: 0
-    # internal: true
+    id: actual_limit_current_max
+    accuracy_decimals: 5
+    internal: true
 
   - platform: adc
     id: adc_vconv
