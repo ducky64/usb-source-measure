@@ -29,7 +29,6 @@ class SmuInterface:
   kNameCalVoltageSetFactor = 'Cal Voltage Set Factor'
   kNameCalVoltageSetOffset = 'Cal Voltage Set Offset'
   kNameCalVoltageFineSetFactor = 'Cal Voltage Fine Set Factor'
-  kNameCalVoltageFineSetOffset = 'Cal Voltage Fine Set Offset'
 
   kNameCalCurrentMeasFactor = ['Cal Current0 Meas Factor', 'Cal Current1 Meas Factor', 'Cal Current2 Meas Factor']
   kNameCalCurrentMeasOffset = ['Cal Current0 Meas Offset', 'Cal Current1 Meas Offset', 'Cal Current2 Meas Offset']
@@ -39,7 +38,7 @@ class SmuInterface:
   kNameAllCal = [
     kNameCalVoltageMeasFactor, kNameCalVoltageMeasOffset,
     kNameCalVoltageSetFactor, kNameCalVoltageSetOffset,
-    kNameCalVoltageFineSetFactor, kNameCalVoltageFineSetOffset,
+    kNameCalVoltageFineSetFactor,
   ] + kNameCalCurrentMeasFactor + kNameCalCurrentMeasOffset + kNameCalCurrentSetFactor + kNameCalCurrentSetOffset
 
   def _webapi_name(self, name: str) -> str:
@@ -91,7 +90,7 @@ class SmuInterface:
   def get_voltage_current_set(self) -> Tuple[decimal.Decimal, decimal.Decimal, decimal.Decimal, decimal.Decimal]:
       """Returns the voltage (coarse, fine) and current (sink limit, source limit) as a DAC-quantized target value"""
       return (self._get('sensor', self.kNameActualSetVoltage),
-              self._get('number', self.kNameActualSetVoltageFine),
+              self._get('number', self.kNameActualSetVoltageFine),  # inout typed
               self._get('sensor', self.kNameActualSetCurrentMin),
               self._get('sensor', self.kNameActualSetCurrentMax))
 

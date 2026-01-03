@@ -53,9 +53,8 @@ if __name__ == "__main__":
 
             for set_voltage_fine in kVoltageCalFinePoints:
                 smu.set_voltage_fine(set_voltage_fine)
-                set_voltage_readback, set_voltage_fine_readback, _, _ = smu.get_voltage_current_set()
                 time.sleep(kSetReadDelay)
-
+                set_voltage_readback, set_voltage_fine_readback, _, _ = smu.get_voltage_current_set()
                 set_voltage_data.append((set_voltage_readback, set_voltage_fine_readback))
                 meas_voltage, meas_current = smu.get_voltage_current()
                 meas_voltage_data.append(meas_voltage)
