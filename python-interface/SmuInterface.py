@@ -75,6 +75,9 @@ class SmuInterface:
   def set_voltage(self, voltage: float) -> None:
     self._set('number', self.kNameSetVoltage, voltage)
 
+  def set_voltage_fine(self, voltage: float) -> None:
+    self._set('number', self.kNameActualSetVoltageFine, voltage)
+
   def set_current_limits(self, current_min: float, current_max: float) -> None:
     assert current_min < current_max
     self._set('number', self.kNameSetCurrentMin, current_min)
@@ -87,10 +90,10 @@ class SmuInterface:
 
   def get_voltage_current_set(self) -> Tuple[decimal.Decimal, decimal.Decimal, decimal.Decimal, decimal.Decimal]:
       """Returns the voltage (coarse, fine) and current (sink limit, source limit) as a DAC-quantized target value"""
-      return (self._get('number', self.kNameActualSetVoltage),
+      return (self._get('sensor', self.kNameActualSetVoltage),
               self._get('number', self.kNameActualSetVoltageFine),
-              self._get('number', self.kNameActualSetCurrentMin),
-              self._get('number', self.kNameActualSetCurrentMax))
+              self._get('sensor', self.kNameActualSetCurrentMin),
+              self._get('sensor', self.kNameActualSetCurrentMax))
 
   def get_deriv_power(self) -> decimal.Decimal:
     """Returns the derived power in watts"""
