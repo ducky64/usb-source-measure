@@ -444,13 +444,13 @@ number:
       - then:
         - lambda: |-
             id(dac_voltage_fine)->write_state(
-                0.5 - valueToAdc(x, id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, id(kCalSetVoltageFineOffset).state)
+                0.5 - valueToAdc(x, id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, 0)
             );
 
             // then write back out the quantized value
             id(actual_set_voltage_fine).publish_state(
               adcToValue(0.5 - id(dac_voltage_fine).rawValue / 4095.0, 
-                id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, id(kCalSetVoltageFineOffset).state)
+                id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, 0)
             );
 
 select:
