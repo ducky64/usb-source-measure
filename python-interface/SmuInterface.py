@@ -16,6 +16,10 @@ class SmuInterface:
   kNameAdcVoltage = 'Meas ADC Voltage'
   kNameDerivPower = 'Deriv Power'
   kNameDerivEnergy = 'Deriv Energy'
+  kNameDacVoltage = 'DAC Voltage'
+  kNameDacVoltageFine = 'DAC Voltage Fine'
+  kNameDacCurrentSink = 'DAC Current Source Limit'
+  kNameDacCurrentSource = 'DAC Current Sink Limit'
 
   kNameSetCurrentMin = 'Set Current Min'
   kNameSetCurrentMax = 'Set Current Max'
@@ -84,6 +88,13 @@ class SmuInterface:
     """Returns the voltage and current ADC counts"""
     return (int(self._get('sensor', self.kNameAdcVoltage)),
             int(self._get('sensor', self.kNameAdcCurrent)))
+
+  def get_voltage_current_set(self) -> Tuple[decimal.Decimal, decimal.Decimal, decimal.Decimal, decimal.Decimal]:
+      """Returns the voltage (coarse, fine) and current (sink limit, source limit) as a DAC-quantized ratio"""
+      return (self._get('number', self.kNameDacVoltage),
+              self._get('number', self.kNameDacVoltageFine),
+              self._get('number', self.kNameDacCurrentSink),
+              self._get('number', self.kNameDacCurrentSource))
 
   def get_deriv_power(self) -> decimal.Decimal:
     """Returns the derived power in watts"""
