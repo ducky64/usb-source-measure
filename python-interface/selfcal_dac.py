@@ -32,10 +32,10 @@ if __name__ == "__main__":
 
     while True:
         print('Clear and re-run calibration? [y/n]: ', end='')
-        user_data = input()
-        if user_data.lower() == 'y':
+        user_input = input()
+        if user_input.lower() == 'y':
             break
-        elif user_data.lower() == 'n':
+        elif user_input.lower() == 'n':
             sys.exit()
 
     smu.cal_set_voltage_set(1, 0)
@@ -78,10 +78,10 @@ if __name__ == "__main__":
     print(f'  residuals: {residuals}')
     while True:
         print('Update calibration? [y/n]: ', end='')
-        user_data = input()
-        if user_data.lower() == 'y':
+        user_input = input()
+        if user_input.lower() == 'y':
             break
-        elif user_data.lower() == 'n':
+        elif user_input.lower() == 'n':
             sys.exit()
 
     smu.cal_set_voltage_set(factor, offset)
