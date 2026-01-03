@@ -142,9 +142,9 @@ script:
         }
 
         float limitMinVolts = id(kVCenter) - ((id(limit_current_min).state - setCurrentOffset) / setCurrentFactor);
-        id(dac_isink)->write_state(limitMinVolts / id(kVref));
+        id(dac_set_isink)->write_state(limitMinVolts / id(kVref));
         float limitMaxVolts = id(kVCenter) - ((id(limit_current_max).state - setCurrentOffset) / setCurrentFactor);
-        id(dac_isrc)->write_state(limitMaxVolts / id(kVref));
+        id(dac_set_isrc)->write_state(limitMaxVolts / id(kVref));
 
   - id: set_enable_range  # sets the overall enable and current ranging IOs, based on the ranging and enable target
     parameters:
@@ -193,20 +193,20 @@ script:
         float setVoltage = id(set_voltage).state;
         float correctedX = (setVoltage - id(kCalSetVoltageOffset).state) / id(kCalSetVoltageFactor).state;
         float targetVolts = id(kVCenter) - (correctedX / id(kVoltageRatio));
-        id(dac_voltage)->write_state(targetVolts / id(kVref));
-        id(dac_voltage_fine)->write_state(targetVolts / id(kVref));
+        id(dac_set_voltage)->write_state(targetVolts / id(kVref));
+        id(dac_set_voltage_fine)->write_state(targetVolts / id(kVref));
 
 output:
   - platform: mcpwm_sync
     id: buck_pwm
     pin: GPIO17
-    frequency: 250kHz
+    frequency: 500kHz
     deadtime_rising: 0s  # deadtime generated internally by gate driver
     deadtime_falling: 0s
   - platform: mcpwm_sync
     id: boost_pwm
     pin: GPIO18  # this controls the HIGH SIDE switch, so the duty is 1-D
-    frequency: 250kHz
+    frequency: 500kHz
     deadtime_rising: 0s  # deadtime generated internally by gate driver
     deadtime_falling: 0s
     max_duty: 0.37  # up to 1.5x boost ratio, accounting for 0.95 buck ratio
@@ -416,6 +416,56 @@ number:
             id(boost_pwm)->write_state(boostDc);
             ESP_LOGD("BuckBoostCtl", "Target %.02f, buck %.02f, boost %.02f", x, buckDc, boostDc);
             id(buckboost_ratio).publish_state(x);
+
+
+  - platform: template
+    name: "${name} DAC Voltage"
+    id: dac_set_voltage
+    min_value: 0
+    max_value: 1
+    step: 0.0001
+    # internal: true
+    set_action:
+      - then:
+        - lambda: |-  # set the underlying DAC and write back the actual ratio
+            id(dac_voltage)->write_state(x);
+            id(dac_set_voltage)->publish_state(id(dac_voltage).rawValue / 4095);
+  - platform: template
+    name: "${name} DAC Voltage Fine"
+    id: dac_set_voltage_fine
+    min_value: 0
+    max_value: 1
+    step: 0.0001
+    # internal: true
+    set_action:
+      - then:
+        - lambda: |-
+            id(dac_voltage_fine)->write_state(x);
+            id(dac_set_voltage_fine)->publish_state(id(dac_voltage_fine).rawValue / 4095);
+  - platform: template
+    name: "${name} DAC Current Source Limit"
+    id: dac_set_isrc
+    min_value: 0
+    max_value: 1
+    step: 0.0001
+    # internal: true
+    set_action:
+      - then:
+        - lambda: |-
+            id(dac_isrc)->write_state(x);
+            id(dac_set_isrc)->publish_state(id(dac_isrc).rawValue / 4095);
+  - platform: template
+    name: "${name} DAC Current Sink Limit"
+    id: dac_set_isink
+    min_value: 0
+    max_value: 1
+    step: 0.0001
+    internal: true
+    set_action:
+      - then:
+        - lambda: |-
+            id(dac_isink)->write_state(x);
+            id(dac_set_isink)->publish_state(id(dac_isink).rawValue / 4095);
 
 select:
   - platform: template  # published state is the target range, current range is the state of the ranging GPIOs
