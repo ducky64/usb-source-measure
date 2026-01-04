@@ -1,8 +1,10 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
+from esphome.components import i2c
 from esphome.const import CONF_ID
 
 AUTO_LOAD = ['sensor','text_sensor', 'binary_sensor']
+DEPENDENCIES = ["i2c"]
 MULTI_CONF = True
 
 CONF_FUSB302_ID = 'fusb302_id'
@@ -12,12 +14,12 @@ fusb302_ns = cg.esphome_ns.namespace('fusb302')
 
 Fusb302Component = fusb302_ns.class_('Fusb302Component', cg.Component)
 
-CONFIG_SCHEMA = cv.All(
+CONFIG_SCHEMA = (
   cv.Schema({
     cv.GenerateID(): cv.declare_id(Fusb302Component),
     cv.Optional(CONF_TARGET_VOLTAGE, default="5v"): cv.voltage,
-  }).extend(cv.COMPONENT_SCHEMA),
-  cv.only_with_arduino
+  })
+  .extend(i2c.i2c_device_schema(0x22))
 )
 
 

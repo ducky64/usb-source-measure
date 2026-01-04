@@ -1,7 +1,9 @@
 #pragma once
 
-#include <Arduino.h>
-#include <Wire.h>
+#include "esphome/core/component.h"
+#include "esphome/core/hal.h"
+#include "esphome/components/output/float_output.h"
+#include "esphome/components/i2c/i2c.h"
 
 
 // FUSB302 USB Type-C PD controller
@@ -11,9 +13,11 @@
 // - Minimal implementation, links to protocol docs: https://github.com/tschiemer/usbc-pd-fusb302-d
 //   - Protocol summary: https://www.embedded.com/usb-type-c-and-power-delivery-101-power-delivery-protocol/
 //   - Shorter protocol summary: http://blog.teledynelecroy.com/2016/05/usb-type-c-and-power-delivery-messaging.html
+using namespace esphome;
+
 class Fusb302 {
 public:
-  Fusb302(TwoWire& wire) : wire_(wire) {
+  Fusb302(i2c::I2CDevice& i2c) : i2c_(i2c) {
   }
 
   // Single register write convenience wrapper
@@ -135,5 +139,5 @@ public:
   static constexpr uint16_t kMdacVbusCountMv = 420;  // 42mV / count
 
 protected:
-  TwoWire& wire_;
+  i2c::I2CDevice& i2c_;
 };

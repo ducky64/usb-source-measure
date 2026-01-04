@@ -8,6 +8,8 @@ packages:
 
 esp32:
   board: esp32-s3-devkitc-1  # 8MB flash without PSRAM
+  framework:
+    type: esp-idf
 
 esphome:
   name: ducky-iotusbsmu
