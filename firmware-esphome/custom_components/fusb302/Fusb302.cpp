@@ -9,27 +9,11 @@ bool Fusb302::writeRegister(uint8_t addr, uint8_t data) {
 }
 
 bool Fusb302::writeRegister(uint8_t addr, size_t len, uint8_t data[]) {
-  wire_.beginTransmission(kI2cAddr);
-  wire_.write(addr);
-  for (size_t i=0; i<len; i++) {
-    wire_.write(data[i]);
-  }
-  return !wire_.endTransmission();
+  return this->i2c_->write_register(addr, data, len) == esphome::i2c::ERROR_OK;
 }
 
 bool Fusb302::readRegister(uint8_t addr, size_t len, uint8_t data[]) {
-  if (!writeRegister(addr, 0, NULL)) {
-    return false;
-  }
-
-  uint8_t reqd = wire_.requestFrom(kI2cAddr, len);
-  if (reqd != len) {
-    return false;
-  }
-  for (size_t i=0; i<len; i++) {
-    data[i] = wire_.read();
-  }
-  return true;
+  return this->i2c_->read_register(addr, data, len) == esphome::i2c::ERROR_OK;
 }
 
 bool Fusb302::readRegister(uint8_t addr, uint8_t& dataOut) {
@@ -63,31 +47,26 @@ bool Fusb302::writeFifoMessage(uint16_t header, uint8_t numDataObjects, uint32_t
 }
 
 bool Fusb302::readNextRxFifo(uint8_t bufferOut[]) {
-  if (!writeRegister(Register::kFifos, 0, NULL)) {
+  uint8_t buffer[8 * 4 + 4];
+  if (this->i2c_->read_register(Register::kFifos, buffer, 3) != esphome::i2c::ERROR_OK) {
     return false;
   }
 
-  wire_.requestFrom(kI2cAddr, (uint8_t)3);  // read and parse the header
-  uint8_t sofByte = wire_.read();
-  if ((sofByte & kRxFifoTokenMask) != kRxFifoTokens::kSop) {
-    wire_.endTransmission();
+  if ((buffer[0] & kRxFifoTokenMask) != kRxFifoTokens::kSop) {
     return false;
   }
-  bufferOut[0] = wire_.read();
-  bufferOut[1] = wire_.read();
+  bufferOut[0] = buffer[1];
+  bufferOut[1] = buffer[2];
   uint16_t header = UsbPd::unpackUint16(bufferOut + 0);
   uint16_t numDataObjects = UsbPd::MessageHeader::unpackNumDataObjects(header);
-  uint8_t bufferInd = 2;
-  if (wire_.endTransmission()) {
+  uint8_t bufferInd = 0;
+
+  if (this->i2c_->read_register(Register::kFifos, buffer, (uint8_t)(numDataObjects * 4 + 4)) != esphome::i2c::ERROR_OK) {
     return false;
   }
-
-  wire_.requestFrom(kI2cAddr, (uint8_t)(numDataObjects * 4 + 4));  // read out additional data objects
   for (uint8_t i=0; i<numDataObjects * 4; i++) {
-    bufferOut[bufferInd++] = wire_.read();
+    bufferOut[bufferInd + 2] = buffer[bufferInd];
+    bufferInd++;
   }
-  for (uint8_t i=0; i<4; i++) {  // drop the CRC bytes, these should be checked by the chip
-      wire_.read();
-  }
-  return !wire_.endTransmission();
+  return true;
 }

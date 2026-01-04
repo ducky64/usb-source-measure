@@ -1,7 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
-
 #include "UsbPd.h"
 #include "Fusb302.h"
 

@@ -112,16 +112,16 @@ bool UsbPdStateMachine::updateVbus(uint16_t& vbusOutMv) {
     if (deltaWidening_) {
       if (convergedMdac >= 0) {  // converged, stay at single step
       } else {
-        lastMdacDelta_ = min(32, lastMdacDelta_ * 2);
+        lastMdacDelta_ = std::min(32, lastMdacDelta_ * 2);
       }
     } else {
-      lastMdacDelta_ = max(1, lastMdacDelta_ / 2);
+      lastMdacDelta_ = std::max(1, lastMdacDelta_ / 2);
     }
 
     if (!comp) {  // compare false, search downwards
       lastMdacDelta_ = -lastMdacDelta_;
     }
-    newMdacValue = max(0, min(fusb_.kMdacCounts - 1, lastMdacValue_ + lastMdacDelta_));
+    newMdacValue = std::max(0, std::min(fusb_.kMdacCounts - 1, lastMdacValue_ + lastMdacDelta_));
 
     lastComp_ = comp;
   }

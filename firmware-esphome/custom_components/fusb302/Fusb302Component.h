@@ -15,7 +15,7 @@ using namespace esphome;
 
 static const char* TAG = "Fusb302Component";
 
-class Fusb302Component : public Component {
+class Fusb302Component : public Component, public i2c::I2CDevice {
 public:
   sensor::Sensor* sensor_cc_ = nullptr;
   void set_cc_sensor(sensor::Sensor* that) { sensor_cc_ = that; }
@@ -33,7 +33,7 @@ public:
 
   void set_target(float target) { targetMv_ = target * 1000; }
 
-  Fusb302Component() : fusb_(Wire), pd_fsm_(fusb_) {
+  Fusb302Component() : fusb_(this), pd_fsm_(fusb_) {
   }
 
   float get_setup_priority() const override { return setup_priority::HARDWARE; }
