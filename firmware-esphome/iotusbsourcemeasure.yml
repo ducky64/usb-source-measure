@@ -3,8 +3,9 @@ substitutions:
 
 packages:
   - !include calibration_vars.yml
-  - !include instrumentation.yml
   - !include ui.yml
+  - !include instrumentation.yml
+  - !include characterization.yml
 
 esp32:
   board: esp32-s3-devkitc-1  # 8MB flash without PSRAM
@@ -116,8 +117,6 @@ script:
           if (!id(control_enable).state) {  // if not yet turned on
             if (nextConvVolts == convTargetVolts) {  // turn on output enable when target reached
               id(set_enable_range).execute(false);
-            } else {
-              // TODO RGB LEDs
             }
           }
         } else {  // turn off converter
@@ -584,31 +583,6 @@ sensor:
     unit_of_measurement: A
 
   - platform: combination
-    name: "${name} Meas Voltage Noise"
-    id: meas_voltage_noise
-    type: sum  # dummy
-    internal: true
-    accuracy_decimals: 6
-    sources:
-      - source: meas_voltage
-    filters:
-      - range:
-          window_size: 25
-          send_every: 5
-  - platform: combination
-    name: "${name} Meas Current Noise"
-    id: meas_current_noise
-    type: sum  # dummy
-    internal: true
-    accuracy_decimals: 7
-    sources:
-      - source: meas_current
-    filters:
-      - range:
-          window_size: 25
-          send_every: 5
-
-  - platform: combination
     name: "${name} Meas Volage Max"
     id: meas_voltage_max
     type: sum  # dummy
@@ -662,16 +636,6 @@ sensor:
     id: adc_current
     accuracy_decimals: 0
     internal: true
-    
-  # - platform: mcp3561  # TESTING OUTPUT for absolute ADC output
-  #   name: "${name} Int VCenter"
-  #   update_interval: 1s
-  #   mcp3561_id: adc_meas
-  #   channel: CH2
-  #   channel_neg: AGND
-  #   filters:
-  #     - lambda: |-
-  #         return x * id(kVref);
 
   - platform: template  # these are the raw DAC counts
     name: "${name} DAC Voltage"
