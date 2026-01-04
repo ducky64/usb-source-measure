@@ -21,6 +21,14 @@ void drawInverted(display::Display& it, int x, int y, font::Font* font, const ch
   drawInverted(it, x, y, font, display::TextAlign::TOP_LEFT, text);
 }
 
+// Return the static width used by drawValue
+uint8_t drawValueWidth(font::Font* font, uint8_t numDigits, uint8_t numDigitsDecimal) {
+  int width, baseline, dummy;
+  font->measure("8", &width, &dummy, &baseline, &dummy);
+  // negative, integer digits, decimal, decimal digits, decimal group separator
+  return width + width * numDigits + (width - 2) + width * numDigitsDecimal + (numDigitsDecimal - 1) / 3 * 2;
+}
+
 // Utility for drawing 
 // underlineLoc is specified as 0 for the ones digit, 1 for the tens, and -1 for the 1/10s digit, and so on.
 void drawValue(display::Display& it, int x, int y, font::Font* font, 
@@ -47,7 +55,9 @@ void drawValue(display::Display& it, int x, int y, font::Font* font,
     forcedChar = '+';
   }
 
-  // start at numDigits (which is one past the equivalent currentDigit) for the negative sign
+  // currentDigit indicates the position being drawn
+  // numDigits is one past the maximum integer digit, for the negative sign
+  // 0 is the ones digit, and -1 is the first decimal digit, and so on
   for (int8_t currentDigit = numDigits; currentDigit >= -numDigitsDecimal; currentDigit--) {
     int8_t digitsPos = (int8_t)digitsLen - (currentDigit + numDigitsDecimal) - 1;  // position within digits[]
     char thisChar[2] = " ";
@@ -55,9 +65,9 @@ void drawValue(display::Display& it, int x, int y, font::Font* font,
       thisChar[0] = forcedChar;
     } else {
       if (digitsPos < 0) {
-        if (value < 0 && ((digitsLen <= numDigitsDecimal && currentDigit == 1) || (digitsLen > numDigitsDecimal && digitsPos == -1))) {
+        if (value < 0 && currentDigit == numDigits) {
           thisChar[0] = '-';
-        } else if (currentDigit <= 0) {
+        } else if (currentDigit <= 0) {  // zero-pad the ones and decimal positions
           thisChar[0] = '0';
         } else {
           thisChar[0] = ' ';
