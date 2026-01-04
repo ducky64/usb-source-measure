@@ -17,7 +17,7 @@ using namespace esphome;
 
 class Fusb302 {
 public:
-  Fusb302(i2c::I2CDevice& i2c) : i2c_(i2c) {
+  Fusb302(i2c::I2CDevice* i2c) : i2c_(i2c) {
   }
 
   // Single register write convenience wrapper
@@ -139,5 +139,5 @@ public:
   static constexpr uint16_t kMdacVbusCountMv = 420;  // 42mV / count
 
 protected:
-  i2c::I2CDevice& i2c_;
+  i2c::I2CDevice* i2c_;
 };

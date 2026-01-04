@@ -9,11 +9,11 @@ bool Fusb302::writeRegister(uint8_t addr, uint8_t data) {
 }
 
 bool Fusb302::writeRegister(uint8_t addr, size_t len, uint8_t data[]) {
-  return this->i2c_.write_register(addr, data, len) == esphome::i2c::ERROR_OK;
+  return this->i2c_->write_register(addr, data, len) == esphome::i2c::ERROR_OK;
 }
 
 bool Fusb302::readRegister(uint8_t addr, size_t len, uint8_t data[]) {
-  return this->i2c_.read_register(addr, data, len) == esphome::i2c::ERROR_OK;
+  return this->i2c_->read_register(addr, data, len) == esphome::i2c::ERROR_OK;
 }
 
 bool Fusb302::readRegister(uint8_t addr, uint8_t& dataOut) {
@@ -48,7 +48,7 @@ bool Fusb302::writeFifoMessage(uint16_t header, uint8_t numDataObjects, uint32_t
 
 bool Fusb302::readNextRxFifo(uint8_t bufferOut[]) {
   uint8_t buffer[8 * 4 + 4];
-  if (this->i2c_.read_register(Register::kFifos, buffer, 3) != esphome::i2c::ERROR_OK) {
+  if (this->i2c_->read_register(Register::kFifos, buffer, 3) != esphome::i2c::ERROR_OK) {
     return false;
   }
 
@@ -61,7 +61,7 @@ bool Fusb302::readNextRxFifo(uint8_t bufferOut[]) {
   uint16_t numDataObjects = UsbPd::MessageHeader::unpackNumDataObjects(header);
   uint8_t bufferInd = 0;
 
-  if (this->i2c_.read_register(Register::kFifos, buffer, (uint8_t)(numDataObjects * 4 + 4)) != esphome::i2c::ERROR_OK) {
+  if (this->i2c_->read_register(Register::kFifos, buffer, (uint8_t)(numDataObjects * 4 + 4)) != esphome::i2c::ERROR_OK) {
     return false;
   }
   for (uint8_t i=0; i<numDataObjects * 4; i++) {
