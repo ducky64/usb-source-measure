@@ -40,6 +40,11 @@ public:
   // bufferOut must be at least 30 bytes.
   bool readNextRxFifo(uint8_t bufferOut[]);
 
+  // datasheet-specified delay between I2C starts and stops
+  inline void startStopDelay() {
+    delayMicroseconds(1);  // actually should be 0.5 us
+  }
+
   static constexpr uint8_t kI2cAddr = 0x22;  // 7-bit address
 
   enum Register {
