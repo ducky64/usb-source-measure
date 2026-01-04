@@ -6,19 +6,11 @@ uint32_t intpow10(uint8_t n) {
   return lut[n];
 }
 
-void drawInverted(display::Display& it, int x, int y, font::Font* font, display::TextAlign align, const char* text) {
+void drawInverted(display::Display& it, int x, int y, font::Font* font, const char* text) {
   int width, baseline, dummy;
   font->measure(text, &width, &dummy, &baseline, &dummy);
-  if (align == display::TextAlign::TOP_LEFT) {
-    it.filled_rectangle(x, y, width - 1, baseline - 1);
-  } else if (align == display::TextAlign::TOP_RIGHT) {
-    it.filled_rectangle(x - width, y, width - 1, baseline - 1);
-  }
-  it.print(x, y, font, COLOR_OFF, align, text);
-}
-
-void drawInverted(display::Display& it, int x, int y, font::Font* font, const char* text) {
-  drawInverted(it, x, y, font, display::TextAlign::TOP_LEFT, text);
+  it.filled_rectangle(x - 1, y, width + 1, baseline);
+  it.print(x, y, font, COLOR_OFF, text);
 }
 
 // Return the static width used by drawValue

@@ -136,11 +136,11 @@ display:
       lineY = 0;
       it.printf(labelX, lineY, id(bdf4x6), "SET");
       if (id(enable).state) {
-        drawInverted(it, valueRightX - 7, lineY, id(bdf4x6), "ON");
+        drawInverted(it, valueRightX - 9, lineY, id(bdf4x6), "ON");
       } else {
-        it.print(valueRightX - 10, lineY, id(bdf4x6), "OFF");
+        it.print(valueRightX - 11, lineY, id(bdf4x6), "OFF");
       }
-      
+
       lineY = 5;
       drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 2, 3), lineY, 
           id(bdf6x10), 2, 3, id(set_voltage).state,
