@@ -11,7 +11,6 @@ if __name__ == "__main__":
   parser.add_argument('name_prefix', type=str, nargs='?')
   parser.add_argument('--restore', action='store_true')
   parser.add_argument('--dump', action='store_true')
-  parser.add_argument('--enable_ranging', action='store_true')
   args = parser.parse_args()
 
   smu = SmuInterface(args.addr)
@@ -45,6 +44,3 @@ if __name__ == "__main__":
       f.write(jsonstr)
 
     print(f"Wrote to {filename}")
-
-  if args.enable_ranging:
-    smu.config_set_current_ranges(1)

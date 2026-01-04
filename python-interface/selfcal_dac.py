@@ -11,10 +11,10 @@ from SmuInterface import SmuInterface
 
 kLimitCurrentMax = 0.05
 kLimitCurrentMin = -0.05
-# kVoltageCalPoints = [1, 2, 4, 8, 12, 16, 20]
-kVoltageCalPoints = [0.5, 1, 2, 4, 6]
-# kVoltageCalFinePoints = [-0.025, -0.015, 0, 0.015, 0.025]
-kVoltageCalFinePoints = [-0.025, 0, 0.025]
+kVoltageCalPoints = [1, 2, 4, 8, 12, 16, 20]
+# kVoltageCalPoints = [0.5, 1, 2, 4, 6]
+kVoltageCalFinePoints = [-0.025, -0.015, 0, 0.015, 0.025]
+# kVoltageCalFinePoints = [-0.025, 0, 0.025]
 
 kSetReadDelay = 0.3  # seconds
 
