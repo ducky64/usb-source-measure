@@ -122,13 +122,23 @@ display:
           id(bdf4x6), "V");
 
       lineY = 15;
-      // TODO LIMIT STATUS
+      if (id(enable).state && id(control_limit_source).state) {
+        drawInverted(it, valueRightX - 7*4 + 1, lineY, id(bdf4x6), "LIMIT +");
+      } else if (id(enable).state && id(control_limit_sink).state) {
+        drawInverted(it, valueRightX - 7*4 + 1, lineY, id(bdf4x6), "LIMIT -");
+      }
 
       lineY = 20;
       drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 1, 4 + currentExtraDigits), lineY, 
           id(bdf6x10), 1, 4 + currentExtraDigits, id(meas_current).get_state());
       it.print(valueRightX - 3, lineY + smallOffY, 
           id(bdf4x6), "A");
+
+      lineY = 35;
+      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 2, 4 + currentExtraDigits), lineY, 
+          id(bdf6x10), 2, 4 + currentExtraDigits, id(deriv_power).get_state());
+      it.print(valueRightX - 3, lineY + smallOffY, 
+          id(bdf4x6), "W");
 
       // RIGHT HALF: SETPOINT SECTION
       labelX = 80;
