@@ -114,6 +114,11 @@ display:
 
       int lineY = 0;
       it.printf(labelX, lineY, id(bdf4x6), "MEAS");
+      if (id(kCalVoltageFactor).state == 1 || id(kCalVoltageOffset).state == 0 || id(kCalSetVoltageFactor).state == 1 || id(kCalSetVoltageOffset).state == 0 ||
+          id(kCalCurrent0Factor).state == 1 || id(kCalCurrent0Offset).state == 0 || id(kCalSetCurrent0Factor).state == 1 || id(kCalSetCurrent0Offset).state == 0) {
+        // TODO currently ignores the current 1 range since it's not supported on most boards
+        drawInverted(it, valueRightX - 5*4 + 1, lineY, id(bdf4x6), "UNCAL");
+      }
 
       lineY = 5;
       drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 2, 3), lineY, 
@@ -139,6 +144,13 @@ display:
           id(bdf6x10), 2, 4 + currentExtraDigits, id(deriv_power).get_state());
       it.print(valueRightX - 3, lineY + smallOffY, 
           id(bdf4x6), "W");
+
+      lineY = 50;
+      // no space for this
+      // drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 4, 2), lineY, 
+      //     id(bdf6x10), 4, 2, id(deriv_energy).get_state());
+      // it.print(valueRightX - 3, lineY + smallOffY, 
+      //     id(bdf4x6), "J");
 
       // RIGHT HALF: SETPOINT SECTION
       labelX = 80;
@@ -178,80 +190,34 @@ display:
       it.print(valueRightX - 3, lineY + smallOffY, 
           id(bdf4x6), "A");
 
-    # // MEASUREMENT SECTION
-    # it.printf(0, 0, id(bdf6x10), "MES");
+      lineY = 45;
+      it.printf(labelX, lineY, id(bdf4x6), "RANGE");
+      if (id(cursor) == 3) {
+        drawInverted(it, valueRightX - 5*4 + 1, lineY, 
+            id(bdf4x6), id(current_range).current_option());
+      } else {
+        it.print(valueRightX - 5*4 + 1, lineY, 
+            id(bdf4x6), id(current_range).current_option());
+      }
 
-    # int measureY = 0;
-    # int voltageX = 4*6, currentX = 76;
-    # int voltageUnitsX = voltageX + 6*6 + 4, currentUnitsX = currentX + 7*6 + 4 + 2;
-    # drawValue(it, voltageX, measureY, id(bdf6x10), 2, 3, id(meas_voltage).get_state());
-    # it.print(voltageUnitsX, measureY + unitsOffsY, id(bdf4x6), "V");
-    # int currentDigitsDecimal = 4;
-    # if (id(current_range).current_option() == "300mA" || id(current_range).current_option() == "30mA") {
-    #   currentDigitsDecimal = 5;
-    # }
-    # drawValue(it, currentX, measureY, id(bdf6x10), 1, currentDigitsDecimal, id(meas_current).get_state());
-    # it.print(currentUnitsX, measureY + unitsOffsY, id(bdf4x6), "A");
-    
-    # drawValue(it, voltageX, measureY + 10, id(bdf6x10), 2, 3, id(deriv_power).get_state());
-    # it.print(voltageUnitsX, measureY + 10 + unitsOffsY, id(bdf4x6), "W");
+      // DEVICE INFO
+      char wifiSsidTrunc[16] = {0};
+      strncpy(wifiSsidTrunc, id(wifi_ssid).state.c_str(), 15);
+      it.print(0, 64-6, id(bdf4x6), TextAlign::BOTTOM_LEFT, wifiSsidTrunc);
+      it.print(0, 64, id(bdf4x6), TextAlign::BOTTOM_LEFT, id(wifi_ip).state.c_str());
 
-    # drawValue(it, currentX, measureY + 10, id(bdf6x10), 4, 2, id(deriv_energy).get_state());
-    # if (id(cursor) == 4) {
-    #   drawInverted(it, currentUnitsX, measureY + 10 + unitsOffsY, id(bdf4x6), "J");
-    # } else {
-    #   it.print(currentUnitsX, measureY + 10 + unitsOffsY, id(bdf4x6), "J");
-    # }
+      it.printf(128, 64-6, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "Ducky SMU");
 
-    # // SETPOINT SECTION
-    # int setY = 26;
-    # it.print(0, setY, id(bdf6x10), id(enable).state ? "ON " : "OFF");
-    
-    # drawValue(it, voltageX, setY, id(bdf6x10), 2, 1, id(set_voltage).state, id(cursor) == 0 ? id(cursorDigit)[0] : -128);
-    # it.print(voltageUnitsX, setY + unitsOffsY, id(bdf4x6), "V");
-
-    # currentDigitsDecimal = 2;
-    # if (id(current_range).current_option() == "300mA" || id(current_range).current_option() == "30mA") {
-    #   currentDigitsDecimal = 3;
-    # }
-    # drawValue(it, currentX, setY, id(bdf6x10), 1, currentDigitsDecimal, id(limit_current_max).state, id(cursor) == 1 ? id(cursorDigit)[1] : -128);
-    # drawValue(it, currentX, setY + 10, id(bdf6x10), 1, currentDigitsDecimal, id(limit_current_min).state, id(cursor) == 2 ? id(cursorDigit)[2] : -128);
-    
-    # it.print(currentUnitsX, setY + unitsOffsY, id(bdf4x6), "A");
-    # it.print(currentUnitsX, setY + 10 + unitsOffsY, id(bdf4x6), "A");
-
-    # if (id(cursor) == 3) {
-    #   drawInverted(it, voltageUnitsX - 8, setY + 10, id(bdf6x10), TextAlign::TOP_RIGHT, id(current_range).current_option());
-    # } else {
-    #   it.print(voltageUnitsX - 8, setY + 10, id(bdf6x10), TextAlign::TOP_RIGHT, id(current_range).current_option());
-    # }
-    # it.print(voltageUnitsX - 8, setY + 10 + unitsOffsY, id(bdf4x6), "Rng");
-
-    # // DEVICE INFO
-    # bool uncal = false;
-    # if (id(kCalVoltageFactor).state == 1 || id(kCalVoltageOffset).state == 0 || id(kCalSetVoltageFactor).state == 1 || id(kCalSetVoltageOffset).state == 0 ||
-    #     id(kCalCurrent0Factor).state == 1 || id(kCalCurrent0Offset).state == 0 || id(kCalSetCurrent0Factor).state == 1 || id(kCalSetCurrent0Offset).state == 0) {
-    #   // TODO currently ignores the current 1 range since it's not supported on most boards
-    #   uncal = true;
-    # }
-
-    # char wifiSsidTrunc[16] = {0};
-    # strncpy(wifiSsidTrunc, id(wifi_ssid).state.c_str(), 15);
-    # it.print(0, 64-6, id(bdf4x6), TextAlign::BOTTOM_LEFT, wifiSsidTrunc);
-    # it.print(0, 64, id(bdf4x6), TextAlign::BOTTOM_LEFT, id(wifi_ip).state.c_str());
-
-    # it.printf(128, 64-6, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%sDucky SMU", uncal ? "-- UNCAL --  " : "");
-
-    # const char* pdState;
-    # switch (id(usbpd).get_state()) {
-    #   case UsbPdStateMachine::kConnected: pdState = "PD"; break;
-    #   default: pdState = "  ";
-    # }
-    # // it.printf(128 - 4, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.f,%2.fc", pdState, id(fusb_vbus).get_state(), id(temp_buckboost).state, id(temp_fets).state);
-    # it.printf(128 - 4, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.fc", pdState, id(fusb_vbus).get_state(), id(temp_fets).state);
-    # if (millis() % 1000 >= 500) {
-    #   it.print(128, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, ".");  // liveness indicator
-    # }
+      const char* pdState;
+      switch (id(usbpd).get_state()) {
+        case UsbPdStateMachine::kConnected: pdState = "PD"; break;
+        default: pdState = "  ";
+      }
+      // it.printf(128 - 4, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.f,%2.fc", pdState, id(fusb_vbus).get_state(), id(temp_buckboost).state, id(temp_fets).state);
+      it.printf(128 - 4, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.fc", pdState, id(fusb_vbus).get_state(), id(temp_fets).state);
+      if (millis() % 1000 >= 500) {
+        it.print(128, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, ".");  // liveness indicator
+      }
 
 binary_sensor:
   - platform: gpio
