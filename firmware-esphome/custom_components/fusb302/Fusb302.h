@@ -2,7 +2,6 @@
 
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
-#include "esphome/components/output/float_output.h"
 #include "esphome/components/i2c/i2c.h"
 
 
@@ -40,11 +39,6 @@ public:
   // Reads the next packet from the RX FIFO, returning true if a packet was read.
   // bufferOut must be at least 30 bytes.
   bool readNextRxFifo(uint8_t bufferOut[]);
-
-  // datasheet-specified delay between I2C starts and stops
-  inline void startStopDelay() {
-    delayMicroseconds(1);  // actually should be 500us, but Arduino doesn't go that low
-  }
 
   static constexpr uint8_t kI2cAddr = 0x22;  // 7-bit address
 

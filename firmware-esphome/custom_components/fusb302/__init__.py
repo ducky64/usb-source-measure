@@ -3,7 +3,7 @@ import esphome.config_validation as cv
 from esphome.components import i2c
 from esphome.const import CONF_ID
 
-AUTO_LOAD = ['sensor','text_sensor', 'binary_sensor']
+AUTO_LOAD = ['sensor', 'text_sensor', 'binary_sensor']
 DEPENDENCIES = ["i2c"]
 MULTI_CONF = True
 
@@ -12,7 +12,7 @@ CONF_TARGET_VOLTAGE = 'target'
 
 fusb302_ns = cg.esphome_ns.namespace('fusb302')
 
-Fusb302Component = fusb302_ns.class_('Fusb302Component', cg.Component)
+Fusb302Component = fusb302_ns.class_('Fusb302Component', cg.Component, i2c.I2CDevice)
 
 CONFIG_SCHEMA = (
   cv.Schema({
