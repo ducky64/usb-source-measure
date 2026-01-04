@@ -1,0 +1,89 @@
+# these are sensors for characterization (not core to SMU functionality)
+
+sensor:
+  - platform: mcp3561  # TESTING OUTPUT for absolute ADC output
+    id: meas_vcenter
+    name: "${name} Int VCenter"
+    # internal: true
+    update_interval: 0.01s  # as fast as possible, limited by ADC conversion time
+    accuracy_decimals: 5
+    mcp3561_id: adc_meas
+    channel: CH2
+    channel_neg: AGND
+    filters:
+      - lambda: |-
+          id(adc_vcenter).publish_state(id(meas_vcenter).rawValue);
+          return x;  // as a ratio
+  - platform: template
+    name: "${name} ADC Int VCenter"
+    id: adc_vcenter
+    accuracy_decimals: 0
+    internal: true
+
+  - platform: combination
+    name: "${name} Meas Voltage Noise"
+    id: meas_voltage_noise
+    type: sum  # dummy
+    internal: true
+    accuracy_decimals: 6
+    sources:
+      - source: meas_voltage
+    filters:
+      - range:
+          window_size: 100
+          send_every: 10
+  - platform: combination
+    name: "${name} Meas Current Noise"
+    id: meas_current_noise
+    type: sum  # dummy
+    internal: true
+    accuracy_decimals: 7
+    sources:
+      - source: meas_current
+    filters:
+      - range:
+          window_size: 100
+          send_every: 10
+
+  - platform: combination
+    name: "${name} Meas Voltage ADC Noise"
+    id: meas_adc_voltage_noise
+    type: sum  # dummy
+    # internal: true
+    accuracy_decimals: 1
+    unit_of_measurement: bits
+    sources:
+      - source: adc_voltage
+    filters:
+      - range:
+          window_size: 100
+          send_every: 10
+      - lambda: return log2(x);
+  - platform: combination
+    name: "${name} Meas Current ADC Noise"
+    id: meas_adc_current_noise
+    type: sum  # dummy
+    # internal: true
+    accuracy_decimals: 1
+    unit_of_measurement: bits
+    sources:
+      - source: adc_current
+    filters:
+      - range:
+          window_size: 100
+          send_every: 10
+      - lambda: return log2(x);
+  - platform: combination
+    name: "${name} Int VCenter ADC Noise"
+    id: adc_vcenter_noise
+    type: sum  # dummy
+    # internal: true
+    accuracy_decimals: 1
+    unit_of_measurement: bits
+    sources:
+      - source: adc_vcenter
+    filters:
+      - range:
+          window_size: 100
+          send_every: 10
+      - lambda: return log2(x);
