@@ -150,8 +150,8 @@ display:
           id(bdf4x6), "W");
 
       lineY = 45;
-      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 4, 2), lineY, 
-          id(bdf6x10), 4, 2, id(deriv_energy).get_state());
+      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 3, 3), lineY, 
+          id(bdf6x10), 3, 3, id(deriv_energy).get_state());
       drawInverted(it, valueRightX - 3, lineY + smallOffY, 
           id(bdf4x6), "J",
           id(cursor) == 4);

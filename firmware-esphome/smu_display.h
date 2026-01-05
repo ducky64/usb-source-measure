@@ -86,7 +86,7 @@ void drawValue(display::Display& it, int x, int y, font::Font* font,
       if (currentDigit == 0) {
         it.print(x - 1, y, font, ".");
         x += width - 2;
-      } else if (currentDigit % 3 == 0) {
+      } else if (currentDigit % 3 == 0 && currentDigit != numDigits) {  // do not insert after negative sign
         x += 2;
       }
     }
