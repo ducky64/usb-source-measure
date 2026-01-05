@@ -684,7 +684,7 @@ sensor:
         input: true
         pullup: true
     internal_filter: 0s
-    update_interval: 33ms
+    update_interval: 50ms
     id: control_limit_source_rate
     internal: true
     total:
@@ -698,7 +698,7 @@ sensor:
         input: true
         pullup: true
     internal_filter: 0s
-    update_interval: 33ms
+    update_interval: 50ms
     id: control_limit_sink_rate
     internal: true
     total:

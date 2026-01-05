@@ -71,7 +71,6 @@ script:
         }
 
 
-
 light:
   - platform: esp32_rmt_led_strip
     id: npx
@@ -87,8 +86,14 @@ light:
     effects:
       - addressable_lambda:
           name: "Smu"
-          update_interval: 50ms
+          update_interval: 100ms
           lambda: |-
+            // use the pulse counter to track fast current limit transients
+            static int lastCurrentSourcePulses = 0, lastCurrentSinkPulses = 0;
+            int currentSourcePulses = id(control_limit_source_pulses).state;
+            int currentSinkPulses = id(control_limit_sink_pulses).state;
+            static bool lastCurrentLimitState = false;  // track the last state to blink on transients
+      
             it.all() = Color(0, 0, 0, 0);
 
             if (!id(conv_en_sense).state) {  // OVP trip makes input LED go red
@@ -101,25 +106,36 @@ light:
             }
 
             if (id(enable).state) {
-              if (id(control_limit_source).state) {
+              if (id(control_limit_source).state ||
+                  (lastCurrentSourcePulses != currentSourcePulses && !lastCurrentLimitState)) {
                 it[4] = Color(255, 255, 0, 0);
 
                 it[1] = Color(255, 0, 0, 0);
                 it[3] = Color(0, 0, 0, 0);
-              } else if (id(control_limit_sink).state) {
+
+                lastCurrentLimitState = true;
+              } else if (id(control_limit_sink).state ||
+                  (lastCurrentSinkPulses != currentSinkPulses && !lastCurrentLimitState)) {
                 it[4] = Color(255, 255, 0, 0);
 
                 it[1] = Color(0, 0, 0, 0);
                 it[3] = Color(255, 0, 0, 0);
+
+                lastCurrentLimitState = false;
               } else {  // voltage mode
                 it[4] = Color(0, 255, 0, 0);
 
                 it[1] = Color(0, 0, 0, 0);
                 it[3] = Color(0, 0, 0, 0);
+
+                lastCurrentLimitState = false;
               }
             } else {
               it[4] = Color(127, 0, 127, 0);  // dim purple for off
+              lastCurrentLimitState = false;
             }
+            lastCurrentSourcePulses = currentSourcePulses;
+            lastCurrentSinkPulses = currentSinkPulses;
       - addressable_rainbow:
           name: Rainbow  # for testing only
     on_turn_on:
@@ -156,6 +172,12 @@ display:
     reset_pin: GPIO12
     update_interval : 200ms
     lambda: |-
+      // use the pulse counter to track fast current limit transients
+      static int lastCurrentSourcePulses = 0, lastCurrentSinkPulses = 0;
+      int currentSourcePulses = id(control_limit_source_pulses).state;
+      int currentSinkPulses = id(control_limit_sink_pulses).state;
+      static bool lastCurrentLimitState = false;  // track the last state to blink on transients
+      
       int baseline, smallBaseline, dummy;
       id(bdf6x10)->measure("X", &dummy, &dummy, &baseline, &dummy);
       id(bdf4x6)->measure("X", &dummy, &dummy, &smallBaseline, &dummy);
@@ -190,12 +212,24 @@ display:
           id(bdf4x6), "V");
 
       lineY = 15;
-      if (id(enable).state && id(control_limit_source).state) {
-        drawInverted(it, valueRightX - 7*4 + 1, lineY, id(bdf4x6), "LIM+");
-      } else if (id(enable).state && id(control_limit_sink).state) {
-        drawInverted(it, valueRightX - 7*4 + 1, lineY, id(bdf4x6), "LIM-");
+      if (id(enable).state) {
+        if (id(control_limit_source).state ||
+            (lastCurrentSourcePulses != currentSourcePulses && !lastCurrentLimitState)) {
+          drawInverted(it, valueRightX - 4*4 + 1, lineY, id(bdf4x6), "LIM+");
+          lastCurrentLimitState = true;
+        } else if (id(control_limit_sink).state ||
+            (lastCurrentSinkPulses != currentSinkPulses && !lastCurrentLimitState)) {
+          drawInverted(it, valueRightX - 4*4 + 1, lineY, id(bdf4x6), "LIM-");
+          lastCurrentLimitState = true;
+        } else {
+          lastCurrentLimitState = false;
+        }
+      } else {
+        lastCurrentLimitState = false;
       }
-
+      lastCurrentSourcePulses = currentSourcePulses;
+      lastCurrentSinkPulses = currentSinkPulses;
+      
       lineY = 20;
       drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 1, 6), lineY, 
           id(bdf6x10), 1, 4 + currentExtraDigits, id(meas_current).get_state());
