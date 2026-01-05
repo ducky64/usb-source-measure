@@ -13,7 +13,8 @@ class MCP3561Sensor : public PollingComponent,
                       public sensor::Sensor,
                       public Parented<MCP3561> {
  public:
-  MCP3561Sensor(MCP3561::Mux channel, MCP3561::Mux channel_neg = MCP3561::kAGnd);
+  MCP3561Sensor(MCP3561::Mux channel, MCP3561::Mux channel_neg = MCP3561::kAGnd, 
+    MCP3561::Gain gain = MCP3561::kX1);
 
   void update() override;  // requests conversions regularly
   void dump_config() override;
@@ -25,6 +26,7 @@ class MCP3561Sensor : public PollingComponent,
 
   MCP3561::Mux channel_;
   MCP3561::Mux channel_neg_;
+  MCP3561::Gain gain_;
 };
 
 }

@@ -98,6 +98,12 @@ uint32_t MCP3561::readReg(uint8_t regAddr, uint8_t bytes) {
 }
 
 void MCP3561::start_conversion(MCP3561Sensor* sensor) {
+  writeReg8(Register::CONFIG2, 
+    (2 << 6) |  // default BOOST
+    ((sensor->gain_ & 7) << 3) | 
+    (1 << 1) |  // default AZ_REF EN
+    (1)  // RESERVED=1
+  );
   writeReg8(Register::MUX, ((sensor->channel_ & 0xf) << 4) | (sensor->channel_neg_ & 0xf));
   fastCommand(FastCommand::kStartConversion);
   conversionStartMillis_ = esphome::millis();

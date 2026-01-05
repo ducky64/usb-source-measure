@@ -86,6 +86,17 @@ class MCP3561 : public Component,
     kVCm = 0xf,
   };
 
+  enum Gain {
+    kX1_3 = 0x0,
+    kX1 = 0x1,  // default
+    kX2 = 0x2,
+    kX4 = 0x3,
+    kX8 = 0x4,
+    kX16 = 0x5,
+    kX32 = 0x6,
+    kX64 = 0x7,
+  };
+
   MCP3561(Osr osr, uint8_t device_address = 1);
 
   void setup() override;

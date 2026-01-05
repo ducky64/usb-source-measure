@@ -50,6 +50,18 @@ OSR = {
     98304: MCP3561Osr.k98304,  # 12.5-50 Hz
 }
 
+MCP3561Gain = MCP3561.enum("Gain")
+GAIN = {
+    "X1/3": MCP3561Gain.kX1_3,
+    "X1": MCP3561Gain.kX1,
+    "X2": MCP3561Gain.kX2,
+    "X4": MCP3561Gain.kX4,
+    "X8": MCP3561Gain.kX8,
+    "X16": MCP3561Gain.kX16,
+    "X32": MCP3561Gain.kX32,
+    "X64": MCP3561Gain.kX64,
+}
+
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(MCP3561),
