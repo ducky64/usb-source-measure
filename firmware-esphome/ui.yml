@@ -14,6 +14,64 @@ globals:
     type: int[2][2]
     initial_value: '{{{-3, 1}, {-2, 0}}}'
 
+script:
+  - id: encoder_rotate
+    parameters:
+      increment: int  # 1 for increment, -1 for decrement
+    then:
+    - lambda: |-
+        if (id(cursor) == 0) {
+          float delta = pow(10, id(cursorDigit)[0]) * increment;
+          id(set_voltage)->make_call().set_value(id(set_voltage)->state + delta).perform();
+        } else if (id(cursor) == 1 || id(cursor) == 2) {
+          float delta = pow(10, id(cursorDigit)[1]) * increment;
+          if (id(cursor) == 1) {
+            id(limit_current_max)->make_call().set_value(id(limit_current_max)->state + delta).perform();
+          } else if (id(cursor) == 2) {
+            id(limit_current_min)->make_call().set_value(id(limit_current_min)->state + delta).perform();
+          }
+        }
+        
+  - id: dir_up_down
+    parameters:
+      increment: int  # 1 for increment, -1 for decrement
+    then:
+    - lambda: |-
+        id(cursor) = (id(cursor) + id(kCursorChoices) + increment) % id(kCursorChoices);  // signed modulo is undefined
+        if (id(cursor) == 1 || id(cursor) == 2) {  // clip to limit, if it has changed
+          id(cursorDigit)[1] = min(max(id(cursorDigit)[1],
+                                       id(kCursorDigitLimits)[1][0]), id(kCursorDigitLimits)[1][1]);
+        }
+  - id: dir_left_right
+    parameters:
+      increment: int  # 1 for increment, -1 for decrement
+    then:
+    - lambda: |-
+        if (id(cursor) == 0) {
+          id(cursorDigit)[0] = min(max(id(cursorDigit)[0] + increment, 
+                                       id(kCursorDigitLimits)[0][0]), id(kCursorDigitLimits)[0][1]);
+        } else if (id(cursor) == 1 || id(cursor) == 2) {
+          id(cursorDigit)[1] = min(max(id(cursorDigit)[1] + increment, 
+                                       id(kCursorDigitLimits)[1][0]), id(kCursorDigitLimits)[1][1]);
+        } else if (id(cursor) == 3) {
+          auto index = id(current_range).active_index();
+          if (index.has_value()) {
+            id(current_range)->make_call().set_index(index.value() + increment).perform();
+          }
+
+          if (id(current_range).current_option() == "300mA") {
+            id(kCursorDigitLimits)[1][0] = -3;
+          } else if (id(current_range).current_option() == "30mA") {
+            id(kCursorDigitLimits)[1][0] = -4;
+          } else {  // assume 3A mode
+            id(kCursorDigitLimits)[1][0] = -2;
+          }
+        } else if (id(cursor) == 4) {
+          id(integrator_reset).press();
+        }
+
+
+
 light:
   - platform: esp32_rmt_led_strip
     id: npx
@@ -341,29 +399,11 @@ sensor:
         pullup: true
     on_clockwise:
     - then:
-        - lambda: |-
-            if (id(cursor) == 0) {
-              float increment = pow(10, id(cursorDigit)[0]);
-              id(set_voltage)->make_call().set_value(id(set_voltage)->state + increment).perform();
-            } else if (id(cursor) == 1 || id(cursor) == 2) {
-              float increment = pow(10, id(cursorDigit)[1]);
-              if (id(cursor) == 1) {
-                id(limit_current_max)->make_call().set_value(id(limit_current_max)->state + increment).perform();
-              } else if (id(cursor) == 2) {
-                id(limit_current_min)->make_call().set_value(id(limit_current_min)->state + increment).perform();
-              }
-            }
+      - script.execute:
+          id: encoder_rotate
+          increment: 1
     on_anticlockwise:
     - then:
-        - lambda: |-
-            if (id(cursor) == 0) {
-              float increment = -pow(10, id(cursorDigit)[0]);
-              id(set_voltage)->make_call().set_value(id(set_voltage)->state + increment).perform();
-            } else if (id(cursor) == 1 || id(cursor) == 2) {
-              float increment = -pow(10, id(cursorDigit)[1]);
-              if (id(cursor) == 1) {
-                id(limit_current_max)->make_call().set_value(id(limit_current_max)->state + increment).perform();
-              } else if (id(cursor) == 2) {
-                id(limit_current_min)->make_call().set_value(id(limit_current_min)->state + increment).perform();
-              }
-            }
+      - script.execute:
+          id: encoder_rotate
+          increment: -1
