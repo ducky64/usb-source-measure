@@ -3,7 +3,7 @@
 
 namespace sample_buffer {
 
-bool SampleBuffer::canHandle(AsyncWebServerRequest *request) {
+bool SampleBuffer::canHandle(AsyncWebServerRequest *request) const {
   if (request->method() == HTTP_GET) {
     if (request->url() == "/samples")
       return true;

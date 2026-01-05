@@ -30,14 +30,14 @@ struct SampleRecord {
 //   (timestamp in millis),(sensor name),(value)
 // and ends with the next sample index
 // If the start sample is beyond the buffer, returns just the next sample index
-class SampleBuffer : public AsyncWebHandler, public Component {
+class SampleBuffer : public Component, public AsyncWebHandler {
  public:
   SampleBuffer(web_server_base::WebServerBase *base) : base_(base) {}
 
   // Add a sensor source to this sample buffer
   void add_source(sensor::Sensor *source, const std::string &name);
 
-  bool canHandle(AsyncWebServerRequest *request);
+  bool canHandle(AsyncWebServerRequest *request) const override;
 
   void handleRequest(AsyncWebServerRequest *req) override;
 

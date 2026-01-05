@@ -6,19 +6,25 @@ uint32_t intpow10(uint8_t n) {
   return lut[n];
 }
 
-void drawInverted(display::Display& it, int x, int y, font::Font* font, display::TextAlign align, const char* text) {
-  int width, baseline, dummy;
-  font->measure(text, &width, &dummy, &baseline, &dummy);
-  if (align == display::TextAlign::TOP_LEFT) {
-    it.filled_rectangle(x, y, width - 1, baseline - 1);
-  } else if (align == display::TextAlign::TOP_RIGHT) {
-    it.filled_rectangle(x - width, y, width - 1, baseline - 1);
+// Draws some text, optionally inverted.
+void drawInverted(display::Display& it, int x, int y, font::Font* font, const char* text, bool invert = true) {
+  if (invert) {
+    int width, baseline, dummy;
+    font->measure(text, &width, &dummy, &baseline, &dummy);
+    it.filled_rectangle(x - 1, y, width + 1, baseline);
+    it.print(x, y, font, COLOR_OFF, text);
+  } else {
+    it.print(x, y, font, text);
   }
-  it.print(x, y, font, COLOR_OFF, align, text);
 }
 
-void drawInverted(display::Display& it, int x, int y, font::Font* font, const char* text) {
-  drawInverted(it, x, y, font, display::TextAlign::TOP_LEFT, text);
+// Return the static width used by drawValue
+uint8_t drawValueWidth(font::Font* font, uint8_t numDigits, uint8_t numDigitsDecimal) {
+  int width, baseline, dummy;
+  font->measure("8", &width, &dummy, &baseline, &dummy);
+  // negative, integer digits, integer digits group separator, decimal, decimal digits, decimal group separator
+  return width + width * numDigits + (numDigits - 1) / 3 * 2 + (width - 2) + 
+      width * numDigitsDecimal + (numDigitsDecimal - 1) / 3 * 2;
 }
 
 // Utility for drawing 
@@ -47,7 +53,10 @@ void drawValue(display::Display& it, int x, int y, font::Font* font,
     forcedChar = '+';
   }
 
-  // start at numDigits (which is one past the equivalent currentDigit) for the negative sign
+  // currentDigit indicates the position being drawn
+  // numDigits is one past the maximum integer digit, for the negative sign
+  // the most significant integer digit is at numDigits - 1,
+  // 0 is the ones digit, and -1 is the first decimal digit, and so on
   for (int8_t currentDigit = numDigits; currentDigit >= -numDigitsDecimal; currentDigit--) {
     int8_t digitsPos = (int8_t)digitsLen - (currentDigit + numDigitsDecimal) - 1;  // position within digits[]
     char thisChar[2] = " ";
@@ -55,9 +64,9 @@ void drawValue(display::Display& it, int x, int y, font::Font* font,
       thisChar[0] = forcedChar;
     } else {
       if (digitsPos < 0) {
-        if (value < 0 && ((digitsLen <= numDigitsDecimal && currentDigit == 1) || (digitsLen > numDigitsDecimal && digitsPos == -1))) {
+        if (value < 0 && currentDigit == numDigits) {
           thisChar[0] = '-';
-        } else if (currentDigit <= 0) {
+        } else if (currentDigit <= 0) {  // zero-pad the ones and decimal positions
           thisChar[0] = '0';
         } else {
           thisChar[0] = ' ';
@@ -78,9 +87,26 @@ void drawValue(display::Display& it, int x, int y, font::Font* font,
       if (currentDigit == 0) {
         it.print(x - 1, y, font, ".");
         x += width - 2;
-      } else if (currentDigit % 3 == 0) {
+      } else if (currentDigit % 3 == 0 && currentDigit != numDigits) {  // do not insert after negative sign
         x += 2;
       }
     }
+  }
+}
+
+// Given a value, calculate a scaled value (1-999.99) with a SI prefix, if needed.
+void siPrefixValue(float value, float *scaledOut, const char** prefixOut) {
+  const char* kPrefixes[] = {"", "k", "M", "G", "T", "P", "E", "Z", "Y", "R", "Q"};
+
+  if (value == 0) {
+    *scaledOut = value;
+    *prefixOut = kPrefixes[0];
+  } else {
+    int8_t prefixIndex = int(log10(abs(value)) / 3);
+    prefixIndex = std::max(std::min(prefixIndex, 
+        (int8_t)(sizeof(kPrefixes) / sizeof(kPrefixes[0]) - 1)),
+        (int8_t)0);
+    *scaledOut = value / pow(10.0, prefixIndex * 3);
+    *prefixOut = kPrefixes[prefixIndex];
   }
 }
