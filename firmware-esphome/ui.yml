@@ -4,12 +4,15 @@ globals:
   - id: cursor
     type: int
     initial_value: '0'  # 0 = voltage, 1 = current lim max, 2 = current lim min, 3 = range, 4 = reset integrators
+  - id: kCursorChoices
+    type: int
+    initial_value: '5'
   - id: cursorDigit
-    type: int[5]
-    initial_value: '{-1, -1, -1, 0, 0}'
-  - id: kCursorDigitLimits
-    type: int[5][2]
-    initial_value: '{{{-1, 1}, {-2, 0}, {-2, 0}, {0, 0}, {0, 0}}}'
+    type: int[2]
+    initial_value: '{-1, -1}'
+  - id: kCursorDigitLimits  # note: dynamically changes with current range
+    type: int[2][2]
+    initial_value: '{{{-3, 1}, {-2, 0}}}'
 
 light:
   - platform: esp32_rmt_led_strip
@@ -110,7 +113,7 @@ display:
 
       // LEFT HALF: MEASUREMENT SECTION
       int labelX = 0;
-      int valueRightX = 63;
+      int valueRightX = 65;
 
       int lineY = 0;
       it.printf(labelX, lineY, id(bdf4x6), "MEAS%s",
@@ -122,7 +125,7 @@ display:
       }
 
       lineY = 5;
-      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 2, 3), lineY, 
+      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 2, 6), lineY, 
           id(bdf6x10), 2, 3, id(meas_voltage).get_state());
       it.print(valueRightX - 3, lineY + smallOffY, 
           id(bdf4x6), "V");
@@ -135,13 +138,13 @@ display:
       }
 
       lineY = 20;
-      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 1, 4 + currentExtraDigits), lineY, 
+      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 1, 6), lineY, 
           id(bdf6x10), 1, 4 + currentExtraDigits, id(meas_current).get_state());
       it.print(valueRightX - 3, lineY + smallOffY, 
           id(bdf4x6), "A");
 
       lineY = 35;
-      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 2, 4 + currentExtraDigits), lineY, 
+      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 2, 6), lineY, 
           id(bdf6x10), 2, 4 + currentExtraDigits, id(deriv_power).get_state());
       it.print(valueRightX - 3, lineY + smallOffY, 
           id(bdf4x6), "W");
@@ -165,7 +168,7 @@ display:
       }
 
       lineY = 5;
-      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 2, 3), lineY, 
+      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 2, 4), lineY, 
           id(bdf6x10), 2, 3, id(set_voltage).state,
           id(cursor) == 0 ? id(cursorDigit)[0] : -128);
       it.print(valueRightX - 3, lineY + smallOffY, 
@@ -175,7 +178,7 @@ display:
       it.printf(labelX, lineY, id(bdf4x6), "LIMIT +");
 
       lineY = 20;
-      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 1, 2 + currentExtraDigits), lineY, 
+      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 1, 4), lineY, 
           id(bdf6x10), 1, 2 + currentExtraDigits, id(limit_current_max).state,
           id(cursor) == 1 ? id(cursorDigit)[1] : -128);
       it.print(valueRightX - 3, lineY + smallOffY, 
@@ -185,9 +188,9 @@ display:
       it.printf(labelX, lineY, id(bdf4x6), "LIMIT -");
 
       lineY = 35;
-      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 1, 2 + currentExtraDigits), lineY, 
+      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 1, 4), lineY, 
           id(bdf6x10), 1, 2 + currentExtraDigits, id(limit_current_min).state,
-          id(cursor) == 2 ? id(cursorDigit)[2] : -128);
+          id(cursor) == 2 ? id(cursorDigit)[1] : -128);
       it.print(valueRightX - 3, lineY + smallOffY, 
           id(bdf4x6), "A");
 
@@ -260,9 +263,9 @@ binary_sensor:
       - delayed_on: 10ms
     on_click:
     - then:
-        - lambda: |-
-            const size_t choices = sizeof(id(cursorDigit)) / sizeof(id(cursorDigit)[0]);
-            id(cursor) = (id(cursor) - 1 + choices) % choices;  // signed modulo is undefined
+      - script.execute:
+          id: dir_up_down
+          increment: -1
   - platform: gpio
     name: "${name} Dir Down"
     internal: true
@@ -276,8 +279,9 @@ binary_sensor:
       - delayed_on: 10ms
     on_click:
     - then:
-        - lambda: |-
-            id(cursor) = (id(cursor) + 1) % (sizeof(id(cursorDigit)) / sizeof(id(cursorDigit)[0]));
+      - script.execute:
+          id: dir_up_down
+          increment: 1
   - platform: gpio
     name: "${name} Dir Left"
     internal: true
@@ -291,16 +295,9 @@ binary_sensor:
       - delayed_on: 10ms
     on_click:
     - then:
-        - lambda: |-
-            id(cursorDigit)[id(cursor)] = min(id(cursorDigit)[id(cursor)] + 1, id(kCursorDigitLimits)[id(cursor)][1]);
-            if (id(cursor) == 3) {
-              auto index = id(current_range).active_index();
-              if (index.has_value()) {
-                id(current_range)->make_call().set_index(index.value() - 1).perform();
-              }
-            } else if (id(cursor) == 4) {
-              id(integrator_reset).press();
-            }
+      - script.execute:
+          id: dir_left_right
+          increment: 1
   - platform: gpio
     name: "${name} Dir Right"
     internal: true
@@ -314,16 +311,9 @@ binary_sensor:
       - delayed_on: 10ms
     on_click:
     - then:
-        - lambda: |-
-            id(cursorDigit)[id(cursor)] = max(id(cursorDigit)[id(cursor)] - 1, id(kCursorDigitLimits)[id(cursor)][0]);
-            if (id(cursor) == 3) {
-              auto index = id(current_range).active_index();
-              if (index.has_value()) {
-                id(current_range)->make_call().set_index(index.value() + 1).perform();
-              }
-            } else if (id(cursor) == 4) {
-              id(integrator_reset).press();
-            }
+      - script.execute:
+          id: dir_left_right
+          increment: -1
 
 sensor:
   - platform: rotary_encoder
@@ -347,22 +337,28 @@ sensor:
     on_clockwise:
     - then:
         - lambda: |-
-            float increment = pow(10, id(cursorDigit)[id(cursor)]);
             if (id(cursor) == 0) {
+              float increment = pow(10, id(cursorDigit)[0]);
               id(set_voltage)->make_call().set_value(id(set_voltage)->state + increment).perform();
-            } else if (id(cursor) == 1) {
-              id(limit_current_max)->make_call().set_value(id(limit_current_max)->state + increment).perform();
-            } else if (id(cursor) == 2) {
-              id(limit_current_min)->make_call().set_value(id(limit_current_min)->state + increment).perform();
+            } else if (id(cursor) == 1 || id(cursor) == 2) {
+              float increment = pow(10, id(cursorDigit)[1]);
+              if (id(cursor) == 1) {
+                id(limit_current_max)->make_call().set_value(id(limit_current_max)->state + increment).perform();
+              } else if (id(cursor) == 2) {
+                id(limit_current_min)->make_call().set_value(id(limit_current_min)->state + increment).perform();
+              }
             }
     on_anticlockwise:
     - then:
         - lambda: |-
-            float increment = -pow(10, id(cursorDigit)[id(cursor)]);
             if (id(cursor) == 0) {
+              float increment = -pow(10, id(cursorDigit)[0]);
               id(set_voltage)->make_call().set_value(id(set_voltage)->state + increment).perform();
-            } else if (id(cursor) == 1) {
-              id(limit_current_max)->make_call().set_value(id(limit_current_max)->state + increment).perform();
-            } else if (id(cursor) == 2) {
-              id(limit_current_min)->make_call().set_value(id(limit_current_min)->state + increment).perform();
+            } else if (id(cursor) == 1 || id(cursor) == 2) {
+              float increment = -pow(10, id(cursorDigit)[1]);
+              if (id(cursor) == 1) {
+                id(limit_current_max)->make_call().set_value(id(limit_current_max)->state + increment).perform();
+              } else if (id(cursor) == 2) {
+                id(limit_current_min)->make_call().set_value(id(limit_current_min)->state + increment).perform();
+              }
             }
