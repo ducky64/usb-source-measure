@@ -9,7 +9,7 @@ globals:
     initial_value: '5'
   - id: cursorDigit
     type: int[2]
-    initial_value: '{-1, -1}'
+    initial_value: '{-1, -1}'  # 0 = voltage, 1 = current lim min and max (shared)
   - id: kCursorDigitLimits  # note: dynamically changes with current range
     type: int[2][2]
     initial_value: '{{{-3, 1}, {-2, 0}}}'
@@ -179,6 +179,7 @@ display:
       if (id(kCalVoltageFactor).state == 1 || id(kCalVoltageOffset).state == 0 || id(kCalSetVoltageFactor).state == 1 || id(kCalSetVoltageOffset).state == 0 ||
           id(kCalCurrent0Factor).state == 1 || id(kCalCurrent0Offset).state == 0 || id(kCalSetCurrent0Factor).state == 1 || id(kCalSetCurrent0Offset).state == 0) {
         // TODO currently ignores the current 1 range since it's not supported on most boards
+        // default calibration means uncalibrated
         drawInverted(it, valueRightX - 5*4 + 1, lineY, id(bdf4x6), "UNCAL");
       }
 

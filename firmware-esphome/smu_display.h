@@ -55,6 +55,7 @@ void drawValue(display::Display& it, int x, int y, font::Font* font,
 
   // currentDigit indicates the position being drawn
   // numDigits is one past the maximum integer digit, for the negative sign
+  // the most significant integer digit is at numDigits - 1,
   // 0 is the ones digit, and -1 is the first decimal digit, and so on
   for (int8_t currentDigit = numDigits; currentDigit >= -numDigitsDecimal; currentDigit--) {
     int8_t digitsPos = (int8_t)digitsLen - (currentDigit + numDigitsDecimal) - 1;  // position within digits[]
@@ -102,7 +103,9 @@ void siPrefixValue(float value, float *scaledOut, const char** prefixOut) {
     *prefixOut = kPrefixes[0];
   } else {
     int8_t prefixIndex = int(log10(abs(value)) / 3);
-    prefixIndex = std::max(std::min(prefixIndex, (int8_t)(sizeof(kPrefixes) / sizeof(kPrefixes[0]))), (int8_t)0);
+    prefixIndex = std::max(std::min(prefixIndex, 
+        (int8_t)(sizeof(kPrefixes) / sizeof(kPrefixes[0]) - 1)),
+        (int8_t)0);
     *scaledOut = value / pow(10.0, prefixIndex * 3);
     *prefixOut = kPrefixes[prefixIndex];
   }
