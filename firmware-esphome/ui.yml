@@ -132,9 +132,9 @@ display:
 
       lineY = 15;
       if (id(enable).state && id(control_limit_source).state) {
-        drawInverted(it, valueRightX - 7*4 + 1, lineY, id(bdf4x6), "LIMIT +");
+        drawInverted(it, valueRightX - 7*4 + 1, lineY, id(bdf4x6), "LIM+");
       } else if (id(enable).state && id(control_limit_sink).state) {
-        drawInverted(it, valueRightX - 7*4 + 1, lineY, id(bdf4x6), "LIMIT -");
+        drawInverted(it, valueRightX - 7*4 + 1, lineY, id(bdf4x6), "LIM-");
       }
 
       lineY = 20;
@@ -150,11 +150,16 @@ display:
           id(bdf4x6), "W");
 
       lineY = 45;
+      float scaledJoules;
+      const char* joulesPrefix;
+      siPrefixValue(id(deriv_energy).get_state(), &scaledJoules, &joulesPrefix);
       drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 3, 3), lineY, 
-          id(bdf6x10), 3, 3, id(deriv_energy).get_state());
-      drawInverted(it, valueRightX - 3, lineY + smallOffY, 
-          id(bdf4x6), "J",
-          id(cursor) == 4);
+          id(bdf6x10), 3, 3, scaledJoules);
+      it.printf(valueRightX - 3, lineY + smallOffY, 
+          id(bdf4x6), "%sJ", joulesPrefix);
+      if (id(cursor) == 4) {
+        drawInverted(it, 4, lineY + smallOffY, id(bdf4x6), "RST");
+      }
 
       // RIGHT HALF: SETPOINT SECTION
       labelX = 80;
@@ -175,7 +180,7 @@ display:
           id(bdf4x6), "V");
 
       lineY = 15;
-      it.printf(labelX, lineY, id(bdf4x6), "LIMIT +");
+      it.printf(labelX, lineY, id(bdf4x6), "LIM+");
 
       lineY = 20;
       drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 1, 4), lineY, 
@@ -185,7 +190,7 @@ display:
           id(bdf4x6), "A");
 
       lineY = 30;
-      it.printf(labelX, lineY, id(bdf4x6), "LIMIT -");
+      it.printf(labelX, lineY, id(bdf4x6), "LIM-");
 
       lineY = 35;
       drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 1, 4), lineY, 

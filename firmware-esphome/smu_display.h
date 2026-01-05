@@ -92,3 +92,18 @@ void drawValue(display::Display& it, int x, int y, font::Font* font,
     }
   }
 }
+
+// Given a value, calculate a scaled value (1-999.99) with a SI prefix, if needed.
+void siPrefixValue(float value, float *scaledOut, const char** prefixOut) {
+  const char* kPrefixes[] = {"", "k", "M", "G", "T", "P", "E", "Z", "Y", "R", "Q"};
+
+  if (value == 0) {
+    *scaledOut = value;
+    *prefixOut = kPrefixes[0];
+  } else {
+    int8_t prefixIndex = int(log10(abs(value)) / 3);
+    prefixIndex = std::max(std::min(prefixIndex, (int8_t)(sizeof(kPrefixes) / sizeof(kPrefixes[0]))), (int8_t)0);
+    *scaledOut = value / pow(10.0, prefixIndex * 3);
+    *prefixOut = kPrefixes[prefixIndex];
+  }
+}
