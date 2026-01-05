@@ -6,19 +6,25 @@ uint32_t intpow10(uint8_t n) {
   return lut[n];
 }
 
-void drawInverted(display::Display& it, int x, int y, font::Font* font, const char* text) {
-  int width, baseline, dummy;
-  font->measure(text, &width, &dummy, &baseline, &dummy);
-  it.filled_rectangle(x - 1, y, width + 1, baseline);
-  it.print(x, y, font, COLOR_OFF, text);
+// Draws some text, optionally inverted.
+void drawInverted(display::Display& it, int x, int y, font::Font* font, const char* text, bool invert = true) {
+  if (invert) {
+    int width, baseline, dummy;
+    font->measure(text, &width, &dummy, &baseline, &dummy);
+    it.filled_rectangle(x - 1, y, width + 1, baseline);
+    it.print(x, y, font, COLOR_OFF, text);
+  } else {
+    it.print(x, y, font, text);
+  }
 }
 
 // Return the static width used by drawValue
 uint8_t drawValueWidth(font::Font* font, uint8_t numDigits, uint8_t numDigitsDecimal) {
   int width, baseline, dummy;
   font->measure("8", &width, &dummy, &baseline, &dummy);
-  // negative, integer digits, decimal, decimal digits, decimal group separator
-  return width + width * numDigits + (width - 2) + width * numDigitsDecimal + (numDigitsDecimal - 1) / 3 * 2;
+  // negative, integer digits, integer digits group separator, decimal, decimal digits, decimal group separator
+  return width + width * numDigits + (numDigits - 1) / 3 * 2 + (width - 2) + 
+      width * numDigitsDecimal + (numDigitsDecimal - 1) / 3 * 2;
 }
 
 // Utility for drawing 

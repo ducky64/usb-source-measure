@@ -113,7 +113,8 @@ display:
       int valueRightX = 63;
 
       int lineY = 0;
-      it.printf(labelX, lineY, id(bdf4x6), "MEAS");
+      it.printf(labelX, lineY, id(bdf4x6), "MEAS%s",
+          millis() % 1000 >= 500 ? "." : " ");  // liveness indicator
       if (id(kCalVoltageFactor).state == 1 || id(kCalVoltageOffset).state == 0 || id(kCalSetVoltageFactor).state == 1 || id(kCalSetVoltageOffset).state == 0 ||
           id(kCalCurrent0Factor).state == 1 || id(kCalCurrent0Offset).state == 0 || id(kCalSetCurrent0Factor).state == 1 || id(kCalSetCurrent0Offset).state == 0) {
         // TODO currently ignores the current 1 range since it's not supported on most boards
@@ -145,12 +146,12 @@ display:
       it.print(valueRightX - 3, lineY + smallOffY, 
           id(bdf4x6), "W");
 
-      lineY = 50;
-      // no space for this
-      // drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 4, 2), lineY, 
-      //     id(bdf6x10), 4, 2, id(deriv_energy).get_state());
-      // it.print(valueRightX - 3, lineY + smallOffY, 
-      //     id(bdf4x6), "J");
+      lineY = 45;
+      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 4, 2), lineY, 
+          id(bdf6x10), 4, 2, id(deriv_energy).get_state());
+      drawInverted(it, valueRightX - 3, lineY + smallOffY, 
+          id(bdf4x6), "J",
+          id(cursor) == 4);
 
       // RIGHT HALF: SETPOINT SECTION
       labelX = 80;
@@ -192,32 +193,25 @@ display:
 
       lineY = 45;
       it.printf(labelX, lineY, id(bdf4x6), "RANGE");
-      if (id(cursor) == 3) {
-        drawInverted(it, valueRightX - 5*4 + 1, lineY, 
-            id(bdf4x6), id(current_range).current_option());
-      } else {
-        it.print(valueRightX - 5*4 + 1, lineY, 
-            id(bdf4x6), id(current_range).current_option());
-      }
+      drawInverted(it, valueRightX - 5*4 + 1, lineY, 
+          id(bdf4x6), id(current_range).current_option(),
+          id(cursor) == 3);
 
       // DEVICE INFO
-      char wifiSsidTrunc[16] = {0};
-      strncpy(wifiSsidTrunc, id(wifi_ssid).state.c_str(), 15);
-      it.print(0, 64-6, id(bdf4x6), TextAlign::BOTTOM_LEFT, wifiSsidTrunc);
-      it.print(0, 64, id(bdf4x6), TextAlign::BOTTOM_LEFT, id(wifi_ip).state.c_str());
-
-      it.printf(128, 64-6, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "Ducky SMU");
+      const uint8_t kSsidMaxChars = 5;
+      char wifiSsidTrunc[kSsidMaxChars + 1] = {0};
+      strncpy(wifiSsidTrunc, id(wifi_ssid).state.c_str(), kSsidMaxChars);
+      it.printf(0, 64, id(bdf4x6), TextAlign::BOTTOM_LEFT, "%s %s",
+          wifiSsidTrunc, id(wifi_ip).state.c_str());
 
       const char* pdState;
       switch (id(usbpd).get_state()) {
         case UsbPdStateMachine::kConnected: pdState = "PD"; break;
         default: pdState = "  ";
       }
-      // it.printf(128 - 4, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.f,%2.fc", pdState, id(fusb_vbus).get_state(), id(temp_buckboost).state, id(temp_fets).state);
-      it.printf(128 - 4, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.fc", pdState, id(fusb_vbus).get_state(), id(temp_fets).state);
-      if (millis() % 1000 >= 500) {
-        it.print(128, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, ".");  // liveness indicator
-      }
+      it.printf(128, 64-6, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.f,%2.fc", pdState, id(fusb_vbus).get_state(), id(temp_buckboost).state, id(temp_fets).state);
+      
+      it.printf(128, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "Ducky SMU");
 
 binary_sensor:
   - platform: gpio
