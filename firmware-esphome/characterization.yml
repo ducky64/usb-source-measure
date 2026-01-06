@@ -29,7 +29,7 @@ sensor:
     mcp3561_id: adc_meas
     channel: AVDD
     channel_neg: AGND
-    gain: x1/3
+    gain: X1/3
     filters:
       - lambda: |-
           id(adc_avdd_1_3).publish_state(id(meas_avdd_1_3).rawValue);

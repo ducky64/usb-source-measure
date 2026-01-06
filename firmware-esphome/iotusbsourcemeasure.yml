@@ -690,7 +690,7 @@ sensor:
     internal: true
     total:
       id: control_limit_source_pulses
-      name: "${name} Countrol Limit Source Pulses"
+      name: "${name} Control Limit Source Pulses"
   - platform: pulse_counter
     pin: 
       number: GPIO21
@@ -704,7 +704,7 @@ sensor:
     internal: true
     total:
       id: control_limit_sink_pulses
-      name: "${name} Countrol Limit Sink Pulses"
+      name: "${name} Control Limit Sink Pulses"
 
   - platform: adc
     id: adc_vconv

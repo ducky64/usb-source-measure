@@ -121,7 +121,7 @@ light:
                 it[1] = Color(0, 0, 0, 0);
                 it[3] = Color(255, 0, 0, 0);
 
-                lastCurrentLimitState = false;
+                lastCurrentLimitState = true;
               } else {  // voltage mode
                 it[4] = Color(0, 255, 0, 0);
 
