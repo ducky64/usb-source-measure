@@ -66,6 +66,12 @@ class MCP3561 : public Component,
     k64 = 0x1,
     k32 = 0x0
   };
+  const uint32_t kOsr[16] = {  // enum values to OSR rates
+    32, 64, 128, 256,
+    512, 1024, 2048, 4096,
+    8192, 16384, 20480, 24576,
+    40960, 49152, 81920, 98304
+  };
 
   enum Mux {
     kCh0 = 0x0,
@@ -96,6 +102,8 @@ class MCP3561 : public Component,
     kX32 = 0x6,
     kX64 = 0x7,
   };
+
+  const uint64_t kSlowestMclk = 3000000;  // f_mclk_int, lowest
 
   MCP3561(Osr osr, uint8_t device_address = 1);
 

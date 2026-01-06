@@ -148,16 +148,22 @@ void MCP3561::loop() {
   }
 
   size_t prevQueueRead = queueRead_;
-  int32_t result;
-  if (this->readRaw24(&result)) {
-    queue_[queueRead_]->conversion_result(result);
-    queueRead_ = (queueRead_ + 1) % kQueueDepth;
-  } else {
-    if ((esphome::millis() - conversionStartMillis_) >= 1000) {
-      ESP_LOGE(TAG, "conversion timed out");
+  // avoid polling during a conversion to reduce noise
+  if ((esphome::millis() - conversionStartMillis_) >= 
+      (uint64_t)kOsr[osr_] * 1000 / kSlowestMclk * 4) {
+    int32_t result;
+    if (this->readRaw24(&result)) {
+      queue_[queueRead_]->conversion_result(result);
       queueRead_ = (queueRead_ + 1) % kQueueDepth;
+    } else {
+      ESP_LOGW(TAG, "conversion not ready");
+      if ((esphome::millis() - conversionStartMillis_) >= 1000) {
+        ESP_LOGE(TAG, "conversion timed out");
+        queueRead_ = (queueRead_ + 1) % kQueueDepth;
+      }
     }
   }
+
 
   if (queueRead_ != prevQueueRead && queueWrite_ != queueRead_) {  // finished conversion and another is in the queue
     start_conversion(queue_[queueRead_]);
