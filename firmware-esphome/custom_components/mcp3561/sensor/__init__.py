@@ -3,12 +3,13 @@ import esphome.config_validation as cv
 from esphome.components import sensor, voltage_sampler
 from esphome.const import CONF_ID, CONF_CHANNEL, UNIT_VOLT, STATE_CLASS_MEASUREMENT, DEVICE_CLASS_VOLTAGE
 
-from .. import mcp3561_ns, MCP3561, MUX
+from .. import mcp3561_ns, MCP3561, MUX, GAIN
 
 AUTO_LOAD = ["voltage_sampler"]
 DEPENDENCIES = ["mcp3561"]
 
 CONF_CHANNEL_NEG = "channel_neg"
+CONF_GAIN = "gain"
 
 MCP3561Sensor = mcp3561_ns.class_(
     "MCP3561Sensor",
@@ -22,7 +23,6 @@ CONF_MCP3561_ID = "mcp3561_id"
 CONFIG_SCHEMA = (
     sensor.sensor_schema(
       MCP3561Sensor,
-      unit_of_measurement=UNIT_VOLT,
       accuracy_decimals=7,
       state_class=STATE_CLASS_MEASUREMENT,
       device_class=DEVICE_CLASS_VOLTAGE,
@@ -31,6 +31,7 @@ CONFIG_SCHEMA = (
             cv.GenerateID(CONF_MCP3561_ID): cv.use_id(MCP3561),
             cv.Required(CONF_CHANNEL): cv.enum(MUX, upper=True),
             cv.Optional(CONF_CHANNEL_NEG, default="AGND"): cv.enum(MUX, upper=True),
+            cv.Optional(CONF_GAIN, default="X1"): cv.enum(GAIN, upper=True),
         }
     )
     .extend(cv.polling_component_schema("60s"))
@@ -42,6 +43,7 @@ async def to_code(config):
         config[CONF_ID],
         config[CONF_CHANNEL],
         config[CONF_CHANNEL_NEG],
+        config[CONF_GAIN],
     )
     await cg.register_parented(var, config[CONF_MCP3561_ID])
     await cg.register_component(var, config)

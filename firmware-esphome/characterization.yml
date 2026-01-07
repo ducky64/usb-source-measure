@@ -1,7 +1,7 @@
 # these are sensors for characterization (not core to SMU functionality)
 
 sensor:
-  - platform: mcp3561  # TESTING OUTPUT for absolute ADC output
+  - platform: mcp3561
     id: meas_vcenter
     name: "${name} Int VCenter"
     # internal: true
@@ -13,16 +13,35 @@ sensor:
     filters:
       - lambda: |-
           id(adc_vcenter).publish_state(id(meas_vcenter).rawValue);
-          return x;  // as a ratio
+          return x;
   - platform: template
     name: "${name} ADC Int VCenter"
     id: adc_vcenter
     accuracy_decimals: 0
     internal: true
 
+  - platform: mcp3561
+    id: meas_avdd_1_3
+    name: "${name} Int AVdd 1/3"
+    # internal: true
+    update_interval: 0.01s  # as fast as possible, limited by ADC conversion time
+    accuracy_decimals: 5
+    mcp3561_id: adc_meas
+    channel: AVDD
+    channel_neg: AGND
+    gain: X1/3
+    filters:
+      - lambda: |-
+          id(adc_avdd_1_3).publish_state(id(meas_avdd_1_3).rawValue);
+          return x;
+  - platform: template
+    name: "${name} ADC Int AVdd 1/3"
+    id: adc_avdd_1_3
+    accuracy_decimals: 0
+    internal: true
+
   - platform: combination
     name: "${name} Meas Voltage Noise"
-    id: meas_voltage_noise
     type: sum  # dummy
     internal: true
     accuracy_decimals: 6
@@ -34,7 +53,6 @@ sensor:
           send_every: 10
   - platform: combination
     name: "${name} Meas Current Noise"
-    id: meas_current_noise
     type: sum  # dummy
     internal: true
     accuracy_decimals: 7
@@ -47,7 +65,6 @@ sensor:
 
   - platform: combination
     name: "${name} Meas Voltage ADC Noise"
-    id: meas_adc_voltage_noise
     type: sum  # dummy
     # internal: true
     accuracy_decimals: 1
@@ -61,7 +78,6 @@ sensor:
       - lambda: return log2(x);
   - platform: combination
     name: "${name} Meas Current ADC Noise"
-    id: meas_adc_current_noise
     type: sum  # dummy
     # internal: true
     accuracy_decimals: 1
@@ -73,15 +89,28 @@ sensor:
           window_size: 100
           send_every: 10
       - lambda: return log2(x);
+
   - platform: combination
     name: "${name} Int VCenter ADC Noise"
-    id: adc_vcenter_noise
     type: sum  # dummy
     # internal: true
     accuracy_decimals: 1
     unit_of_measurement: bits
     sources:
       - source: adc_vcenter
+    filters:
+      - range:
+          window_size: 100
+          send_every: 10
+      - lambda: return log2(x);
+  - platform: combination
+    name: "${name} Int AVdd 1/3 ADC Noise"
+    type: sum  # dummy
+    # internal: true
+    accuracy_decimals: 1
+    unit_of_measurement: bits
+    sources:
+      - source: adc_avdd_1_3
     filters:
       - range:
           window_size: 100

@@ -39,7 +39,7 @@ OSR = {
     512: MCP3561Osr.k512,  # 2400-9600 Hz
     1024: MCP3561Osr.k1024,  # 1200-4800 Hz
     2048: MCP3561Osr.k2048,  # 600-2400 Hz
-    4096: MCP3561Osr.k4096,  # 300-120 0Hz
+    4096: MCP3561Osr.k4096,  # 300-1200 Hz
     8192: MCP3561Osr.k8192,  # 150-600 Hz
     16384: MCP3561Osr.k16384,  # 75-300 Hz
     20480: MCP3561Osr.k20480,  # 60-240 Hz
@@ -48,6 +48,18 @@ OSR = {
     49152: MCP3561Osr.k49152,  # 25-100 Hz
     81920: MCP3561Osr.k81920,  # 15-60 Hz
     98304: MCP3561Osr.k98304,  # 12.5-50 Hz
+}
+
+MCP3561Gain = MCP3561.enum("Gain")
+GAIN = {
+    "X1/3": MCP3561Gain.kX1_3,
+    "X1": MCP3561Gain.kX1,
+    "X2": MCP3561Gain.kX2,
+    "X4": MCP3561Gain.kX4,
+    "X8": MCP3561Gain.kX8,
+    "X16": MCP3561Gain.kX16,
+    "X32": MCP3561Gain.kX32,
+    "X64": MCP3561Gain.kX64,
 }
 
 CONFIG_SCHEMA = cv.Schema(

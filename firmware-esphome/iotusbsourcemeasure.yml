@@ -499,6 +499,7 @@ binary_sensor:
     name: "${name} Control Limit Source"
     pin: 
       number: GPIO14
+      allow_other_uses: true
       mode:
         input: true
         pullup: true
@@ -507,6 +508,7 @@ binary_sensor:
     name: "${name} Control Limit Sink"
     pin: 
       number: GPIO21
+      allow_other_uses: true
       mode:
         input: true
         pullup: true
@@ -529,6 +531,7 @@ sensor:
   - platform: mcp3561
     id: meas_voltage
     name: "${name} Meas Voltage"
+    unit_of_measurement: V
     update_interval: 0.01s  # as fast as possible, limited by ADC conversion time
     accuracy_decimals: 4
     mcp3561_id: adc_meas
@@ -541,6 +544,7 @@ sensor:
   - platform: mcp3561
     id: meas_current
     name: "${name} Meas Current"
+    unit_of_measurement: A
     update_interval: 0.01s  # as fast as possible, limited by ADC conversion time
     accuracy_decimals: 5
     mcp3561_id: adc_meas
@@ -580,7 +584,6 @@ sensor:
           }
           lastSampleValid = true;
           return value;
-    unit_of_measurement: A
 
   - platform: combination
     name: "${name} Meas Volage Max"
@@ -673,6 +676,35 @@ sensor:
     id: actual_limit_current_max
     accuracy_decimals: 5
     internal: true
+
+  - platform: pulse_counter
+    pin: 
+      number: GPIO14
+      allow_other_uses: true
+      mode:
+        input: true
+        pullup: true
+    internal_filter: 0s
+    update_interval: 50ms
+    id: control_limit_source_rate
+    internal: true
+    total:
+      id: control_limit_source_pulses
+      name: "${name} Control Limit Source Pulses"
+  - platform: pulse_counter
+    pin: 
+      number: GPIO21
+      allow_other_uses: true
+      mode:
+        input: true
+        pullup: true
+    internal_filter: 0s
+    update_interval: 50ms
+    id: control_limit_sink_rate
+    internal: true
+    total:
+      id: control_limit_sink_pulses
+      name: "${name} Control Limit Sink Pulses"
 
   - platform: adc
     id: adc_vconv
