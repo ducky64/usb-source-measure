@@ -35,11 +35,17 @@ class SmuInterface:
   kNameCalCurrentSetFactor = ['Cal Current0 Set Factor', 'Cal Current1 Set Factor', 'Cal Current2 Set Factor']
   kNameCalCurrentSetOffset = ['Cal Current0 Set Offset', 'Cal Current1 Set Offset', 'Cal Current2 Set Offset']
 
+  kNameCalCurrentSetSourceFactor = "Cal Current Set Source Factor"
+  kNameCalCurrentSetSinkFactor = "Cal Current Set Sink Factor"
+  kNameCalCurrentCommonFactor = "Cal Current Common Factor"
+
   kNameAllCal = [
     kNameCalVoltageMeasFactor, kNameCalVoltageMeasOffset,
     kNameCalVoltageSetFactor, kNameCalVoltageSetOffset,
     kNameCalVoltageFineSetFactor,
-  ] + kNameCalCurrentMeasFactor + kNameCalCurrentMeasOffset + kNameCalCurrentSetFactor + kNameCalCurrentSetOffset
+  ] + kNameCalCurrentMeasFactor + kNameCalCurrentMeasOffset + kNameCalCurrentSetFactor + kNameCalCurrentSetOffset + [
+    kNameCalCurrentSetSourceFactor, kNameCalCurrentSetSinkFactor, kNameCalCurrentCommonFactor
+  ]
 
   def _webapi_name(self, name: str) -> str:
     # TODO should actually replace all non-alphanumeric but this is close enough
@@ -116,6 +122,12 @@ class SmuInterface:
     if resp.status_code != 200:
       raise Exception(f'Request failed: {resp.status_code}')
 
+  def cal_get(self, name: str) -> decimal.Decimal:
+    return self._get('number', name, read_value=True)
+
+  def cal_set(self, name: str, value: float) -> None:
+    self._set('number', name, value)
+
   def cal_get_voltage_meas(self) -> Tuple[decimal.Decimal, decimal.Decimal]:
     """Returns the voltage measurement calibration, factor and offset terms"""
     return (self._get('number', self.kNameCalVoltageMeasFactor, read_value=True),
@@ -135,14 +147,6 @@ class SmuInterface:
     """Sets the voltage set calibration, factor and offset terms"""
     self._set('number', self.kNameCalVoltageSetFactor, factor)
     self._set('number', self.kNameCalVoltageSetOffset, offset)
-
-  def cal_get_voltage_fine_set(self) -> decimal.Decimal:
-    """Returns the voltage fine set calibration, factor term (offset rolled into coarse cal)"""
-    return self._get('number', self.kNameCalVoltageFineSetFactor, read_value=True)
-
-  def cal_set_voltage_fine_set(self, factor: float) -> None:
-    """Sets the voltage fine set calibration, factor term"""
-    self._set('number', self.kNameCalVoltageFineSetFactor, factor)
 
   def cal_get_current_meas(self, irange: int) -> Tuple[decimal.Decimal, decimal.Decimal]:
     return (self._get('number', self.kNameCalCurrentMeasFactor[irange], read_value=True),
