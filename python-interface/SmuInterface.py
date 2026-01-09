@@ -8,18 +8,23 @@ class SmuInterface:
 
   kNameMacWifi = 'Mac Wifi'
 
-  kNameMeasCurrent = 'Meas Current'
   kNameMeasVoltage = 'Meas Voltage'
+  kNameMeasCurrent = 'Meas Current'
+  kNameMeasRatioVoltage = 'Meas Ratio Voltage'
+  kNameMeasRatioCurrent = 'Meas Ratio Current'
   kNameDerivPower = 'Deriv Power'
   kNameDerivEnergy = 'Deriv Energy'
 
+  kNameSetVoltage = 'Set Voltage'
   kNameSetCurrentMin = 'Set Current Min'
   kNameSetCurrentMax = 'Set Current Max'
-  kNameSetVoltage = 'Set Voltage'
   kNameActualSetVoltage = 'Set Voltage Actual'
   kNameActualSetVoltageFine = 'Set Voltage Fine Actual'
   kNameActualSetCurrentMin = 'Set Current Min Actual'
   kNameActualSetCurrentMax = 'Set Current Max Actual'
+  kNameSetRatioVoltage = 'Set Ratio Voltage'
+  kNameSetRatioCurrentMin = 'Set Ratio Current Min'
+  kNameSetRatioCurrentMax = 'Set Ratio Current Max'
 
   kNameEnable = "Enable"
   kNameCurrentRange = "Set Current Range"

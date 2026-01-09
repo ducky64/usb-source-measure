@@ -662,12 +662,12 @@ sensor:
     accuracy_decimals: 8
     internal: true
   - platform: template
-    name: "${name} Set Ratio Current Source Limit"
+    name: "${name} Set Ratio Current Max"
     id: dac_ratio_isrc
     accuracy_decimals: 8
     internal: true
   - platform: template
-    name: "${name} Set Ratio Current Sink Limit"
+    name: "${name} Set Ratio Current Min"
     id: dac_ratio_isink
     accuracy_decimals: 8
     internal: true
