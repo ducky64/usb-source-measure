@@ -193,16 +193,16 @@ script:
     - lambda: |-
         // calculate the high precision target DAC value
         float targetDac = 0.5 - valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalVoltageFactor).state, id(kCalVoltageOffset).state);
-        targetDac = targetDac * id(kCalSetVoltageFactor).state + id(kCalSetVoltageOffset).state;
+        targetDac = targetDac + id(kCalSetVoltageOffset).state;  // offset is common across both DACs
 
         // set the coarse voltage first
-        id(dac_voltage)->write_state(targetDac);
+        id(dac_voltage)->write_state(targetDac * id(kCalSetVoltageFactor).state); // coarse cal is for coarse DAC only
         id(dac_ratio_voltage)->publish_state(id(dac_voltage).rawValue / 4095.0 - 0.5);
         id(dac_value_voltage)->publish_state(id(dac_voltage).rawValue);
 
         // then use the fine control to set the remainder
         id(dac_ratio_voltage_fine).make_call().set_value(
-            (targetDac - id(dac_voltage).rawValue / 4095.0) * id(kCalSetVoltageFineFactor).state
+            (targetDac - id(dac_voltage).rawValue / 4095.0 / id(kCalSetVoltageFactor).state) * id(kCalSetVoltageFineFactor).state
         ).perform();
 
 output:

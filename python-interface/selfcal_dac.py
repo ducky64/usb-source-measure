@@ -1,7 +1,6 @@
 import argparse
 import sys
 import time
-from decimal import Decimal
 from typing import Tuple, List
 
 import numpy as np
@@ -78,6 +77,9 @@ if __name__ == "__main__":
     b = -np.array(meas_voltage_data)  # set data is inverted from measurement data
     x, residuals, rank, s = np.linalg.lstsq(a, b, rcond=None)
     factor, factor_fine, offset = x
+    factor = 1/factor
+    factor_fine = 1/factor_fine
+    offset = -offset
 
     print(f'New voltage set cal: {factor}x coarse, {factor_fine}x fine, {offset}')
     print(f'  residuals: {residuals}')
@@ -89,6 +91,6 @@ if __name__ == "__main__":
         elif user_input.lower() == 'n':
             sys.exit()
 
-    smu.cal_set(smu.kNameCalVoltageSetFactor, 1/factor)
-    smu.cal_set(smu.kNameCalVoltageFineSetFactor, 1/factor_fine)
-    smu.cal_set(smu.kNameCalVoltageSetOffset, -offset)
+    smu.cal_set(smu.kNameCalVoltageSetFactor, factor)
+    smu.cal_set(smu.kNameCalVoltageFineSetFactor, factor_fine)
+    smu.cal_set(smu.kNameCalVoltageSetOffset, offset)
