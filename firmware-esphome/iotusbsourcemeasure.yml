@@ -142,12 +142,12 @@ script:
 
         id(dac_isink)->write_state(
             0.5 - valueToAdc(id(limit_current_min).state, setCurrentFactor, 1.0, setCurrentOffset));
-        id(dac_ratio_isink)->publish_state(id(dac_isink).rawValue / 4095.0);
+        id(dac_ratio_isink)->publish_state(id(dac_isink).rawValue / 4095.0 - 0.5);
         id(dac_value_isink)->publish_state(id(dac_isink).rawValue);
 
         id(dac_isrc)->write_state(
             0.5 - valueToAdc(id(limit_current_max).state, setCurrentFactor, 1.0, setCurrentOffset));
-        id(dac_ratio_isrc)->publish_state(id(dac_isrc).rawValue / 4095.0);
+        id(dac_ratio_isrc)->publish_state(id(dac_isrc).rawValue / 4095.0 - 0.5);
         id(dac_value_isrc)->publish_state(id(dac_isrc).rawValue);
 
   - id: set_enable_range  # sets the overall enable and current ranging IOs, based on the ranging and enable target
@@ -200,7 +200,7 @@ script:
 
         // set the coarse voltage first
         id(dac_voltage)->write_state(targetDac);
-        id(dac_ratio_voltage)->publish_state(id(dac_voltage).rawValue / 4095.0);
+        id(dac_ratio_voltage)->publish_state(id(dac_voltage).rawValue / 4095.0 - 0.5);
         id(dac_value_voltage)->publish_state(id(dac_voltage).rawValue);
 
         // then use the fine control to set the remainder
@@ -432,15 +432,15 @@ number:
   - platform: template  # unlike the other ratios, this is inout to allow calibration to actuate independently
     name: "${name} Set Ratio Voltage Fine"
     id: dac_ratio_voltage_fine
-    min_value: -1
-    max_value: 1
+    min_value: -0.5
+    max_value: 0.5
     step: 0.0001
     set_action:
       - then:
         - lambda: |-
-            id(dac_voltage_fine)->write_state(x);
+            id(dac_voltage_fine)->write_state(x + 0.5);
             // then write back out the quantized value
-            id(dac_ratio_voltage_fine).publish_state(id(dac_voltage_fine).rawValue / 4095.0);
+            id(dac_ratio_voltage_fine).publish_state(id(dac_voltage_fine).rawValue / 4095.0 - 0.5);
 
 select:
   - platform: template  # published state is the target range, current range is the state of the ranging GPIOs
@@ -623,16 +623,16 @@ sensor:
     accuracy_decimals: 6
     unit_of_measurement: Ah
 
-  - platform: template
+  - platform: template  # pre-calibration, range [-0.5, 0.5]
     name: "${name} Meas Ratio Voltage"
     id: ratio_voltage
     accuracy_decimals: 8
-    internal: true
+    # internal: true
   - platform: template
     name: "${name} Meas Ratio Current"
     id: ratio_current
     accuracy_decimals: 8
-    internal: true
+    # internal: true
   - platform: template
     name: "${name} Meas ADC Voltage"
     id: adc_voltage
@@ -644,7 +644,7 @@ sensor:
     accuracy_decimals: 0
     internal: true
 
-  - platform: template  # these are all post-quantization, pre-calibration
+  - platform: template  # post-quantization, pre-calibration, range [-0.5, 0.5]
     name: "${name} Set Ratio Voltage"
     id: dac_ratio_voltage
     accuracy_decimals: 8
