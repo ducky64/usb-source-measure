@@ -26,8 +26,9 @@ if __name__ == "__main__":
 
     smu = SmuInterface(args.addr)
 
-    prev_factor, prev_offset = smu.cal_get_voltage_set()
-    prev_factor_fine = smu.cal_get_voltage_fine_set()
+    prev_factor = smu.cal_get(smu.kNameCalVoltageSetFactor)
+    prev_offset = smu.cal_get(smu.kNameCalVoltageSetOffset)
+    prev_factor_fine = smu.cal_get(smu.kNameCalVoltageFineSetFactor)
     print(f'Current voltage set cal: {prev_factor} coarse + {prev_factor_fine} fine + {prev_offset}')
 
     while True:
@@ -38,9 +39,9 @@ if __name__ == "__main__":
         elif user_input.lower() == 'n':
             sys.exit()
 
-    smu.cal_set_voltage_set(1, 0)
-    smu.cal_set_voltage_fine_set(1)
-
+    smu.cal_set(smu.kNameCalVoltageSetFactor, 1)
+    smu.cal_set(smu.kNameCalVoltageSetOffset, 0)
+    smu.cal_set(smu.kNameCalVoltageFineSetFactor, 1)
     smu.set_current_limits(kLimitCurrentMin, kLimitCurrentMax)
 
     set_voltage_data: List[Tuple[Decimal, Decimal]] = []  # quantized readback setpoints
@@ -84,5 +85,6 @@ if __name__ == "__main__":
         elif user_input.lower() == 'n':
             sys.exit()
 
-    smu.cal_set_voltage_set(factor, offset)
-    smu.cal_set_voltage_fine_set(factor_fine)
+    smu.cal_set(smu.kNameCalVoltageSetFactor, factor)
+    smu.cal_set(smu.kNameCalVoltageSetOffset, offset)
+    smu.cal_set(smu.kNameCalVoltageFineSetFactor, factor_fine)

@@ -207,3 +207,50 @@ number:
     set_action:
       - then:
         - lambda: id(kCalSetCurrent2Offset).publish_state(x);
+
+  # these are workarounds for hardware limitations that should get addressed in a future spin
+  # these all operate directly on ADC and DAC ratios and are pre-conversion to actual units
+  # and the associated calibrations
+  # the calibration offsets are zero at zero and do not contribute a static offset
+  # (so there is no offset term for these calibrations)
+  # these calibrate out the voltage drop across the HV -> LV protection circuit
+  # these are multiplied by difference between the ADC reading and DAC setting ratio
+  - platform: template
+    name: "${name} Cal Current Set Source Factor"
+    internal: true
+    id: kCalCurrentSetSourceFactor
+    min_value: -1
+    max_value: 1
+    step: 0.0001
+    initial_value: 0
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalCurrentSetSourceFactor).publish_state(x);
+  - platform: template
+    name: "${name} Cal Current Set Sink Factor"
+    internal: true
+    id: kCalCurrentSetSinkFactor
+    min_value: -1
+    max_value: 1
+    step: 0.0001
+    initial_value: 0
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalCurrentSetSinkFactor).publish_state(x);
+        
+  # this calibrates out common-mode voltage bleed into the current measurement
+  # this is multiplied by the voltage ADC ratio and added to the current ratio
+  - platform: template
+    name: "${name} Cal Current Common Factor"
+    internal: true
+    id: kCalCurrentCommonFactor
+    min_value: -1
+    max_value: 1
+    step: 0.0001
+    initial_value: 0
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalCurrentCommonFactor).publish_state(x);
