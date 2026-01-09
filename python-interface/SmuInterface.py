@@ -45,8 +45,7 @@ class SmuInterface:
 
   kNameAllCal = [
     kNameCalVoltageMeasFactor, kNameCalVoltageMeasOffset,
-    kNameCalVoltageSetFactor, kNameCalVoltageSetOffset,
-    kNameCalVoltageFineSetFactor,
+    kNameCalVoltageSetFactor, kNameCalVoltageFineSetFactor, kNameCalVoltageSetOffset,
   ] + kNameCalCurrentMeasFactor + kNameCalCurrentMeasOffset + kNameCalCurrentSetFactor + kNameCalCurrentSetOffset + [
     kNameCalCurrentSetSourceFactor, kNameCalCurrentSetSinkFactor, kNameCalCurrentCommonFactor
   ]
