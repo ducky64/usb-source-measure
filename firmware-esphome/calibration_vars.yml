@@ -215,9 +215,9 @@ number:
   # these calibrate out the voltage drop across the HV -> LV protection circuit
   # these are multiplied by difference between the ADC reading and DAC setting ratio
   - platform: template
-    name: "${name} Cal Current Resistance Source"
+    name: "${name} Cal Current Set Source Factor"
     internal: true
-    id: kCalCurrentResistanceSource
+    id: kCalCurrentSetSourceFactor
     min_value: -1
     max_value: 1
     step: 0.0000001
@@ -225,11 +225,11 @@ number:
     restore_value: true
     set_action:
       - then:
-        - lambda: id(kCalCurrentResistanceSource).publish_state(x);
+        - lambda: id(kCalCurrentSetSourceFactor).publish_state(x);
   - platform: template
-    name: "${name} Cal Current Resistance Sink"
+    name: "${name} Cal Current Set Sink Factor"
     internal: true
-    id: kCalCurrentResistanceSink
+    id: kCalCurrentSetSinkFactor
     min_value: -1
     max_value: 1
     step: 0.0000001
@@ -237,14 +237,14 @@ number:
     restore_value: true
     set_action:
       - then:
-        - lambda: id(kCalCurrentResistanceSink).publish_state(x);
+        - lambda: id(kCalCurrentSetSinkFactor).publish_state(x);
         
   # this calibrates out common-mode voltage bleed into the current measurement
   # this is multiplied by the voltage ADC ratio and added to the current ratio
   - platform: template
-    name: "${name} Cal Current Common"
+    name: "${name} Cal Current Common Factor"
     internal: true
-    id: kCalCurrentCommon
+    id: kCalCurrentCommonFactor
     min_value: -1
     max_value: 1
     step: 0.0000001
@@ -252,4 +252,4 @@ number:
     restore_value: true
     set_action:
       - then:
-        - lambda: id(kCalCurrentCommon).publish_state(x);
+        - lambda: id(kCalCurrentCommonFactor).publish_state(x);
