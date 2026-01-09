@@ -211,7 +211,8 @@ number:
   # these are workarounds for hardware limitations that should get addressed in a future spin
   # these all operate directly on ADC and DAC ratios and are pre-conversion to actual units
   # and the associated calibrations
-  # the calibration offset are zero at zero and do not contribute a static offset
+  # the calibration offsets are zero at zero and do not contribute a static offset
+  # (so there is no offset term for these calibrations)
   # these calibrate out the voltage drop across the HV -> LV protection circuit
   # these are multiplied by difference between the ADC reading and DAC setting ratio
   - platform: template

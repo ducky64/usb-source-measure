@@ -566,9 +566,9 @@ sensor:
           id(ratio_current).publish_state(x);
           id(adc_current).publish_state(id(meas_current).rawValue);
 
-          x = x + id(kCalCurrentSetSourceFactor).state * (x - id(dac_ratio_isrc).state) 
+          x = x + id(kCalCurrentSetSourceFactor).state * (x - id(dac_ratio_isrc).state)
             + id(kCalCurrentSetSinkFactor).state * (x - id(dac_ratio_isink).state)
-            + id(kCalCurrentCommonFactor).state * (id(ratio_voltage).state - 0.5);
+            + id(kCalCurrentCommonFactor).state * id(ratio_voltage).state;
 
           if (lastRange != thisRange || thisRange < 0) {  // invalidate the measurement on a range change
             lastRange = thisRange;

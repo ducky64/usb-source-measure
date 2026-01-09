@@ -61,10 +61,10 @@ if __name__ == "__main__":
             smu.set_current_limits(set_limit_source, set_limit_sink)
             time.sleep(kSetReadDelay)
 
-            adc_ratio_current = float(smu._get('sensor', smu.kNameMeasRatioCurrent)) - 0.5
+            adc_ratio_current = float(smu._get('sensor', smu.kNameMeasRatioCurrent))
             delta_current_min = adc_ratio_current - float(smu._get('sensor', smu.kNameSetRatioCurrentMin))
             delta_current_max = adc_ratio_current - float(smu._get('sensor', smu.kNameSetRatioCurrentMax))
-            delta_voltage = float(smu._get('sensor', smu.kNameMeasRatioVoltage)) - 0.5
+            delta_voltage = float(smu._get('sensor', smu.kNameMeasRatioVoltage))
             currents.append(-adc_ratio_current)
             data.append((delta_current_min,
                          delta_current_max,
