@@ -221,7 +221,7 @@ number:
     id: kCalCurrentSetSourceFactor
     min_value: -1
     max_value: 1
-    step: 0.0000001
+    step: 0.0001
     initial_value: 0
     restore_value: true
     set_action:
@@ -233,7 +233,7 @@ number:
     id: kCalCurrentSetSinkFactor
     min_value: -1
     max_value: 1
-    step: 0.0000001
+    step: 0.0001
     initial_value: 0
     restore_value: true
     set_action:
@@ -248,7 +248,7 @@ number:
     id: kCalCurrentCommonFactor
     min_value: -1
     max_value: 1
-    step: 0.0000001
+    step: 0.0001
     initial_value: 0
     restore_value: true
     set_action:
