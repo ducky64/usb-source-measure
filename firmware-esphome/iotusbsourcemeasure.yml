@@ -83,9 +83,6 @@ globals:
   - id: kVoltageRatio  # output volts per ADC volt
     type: float
     initial_value: '21.1'  # 1/(0.0426 (divider) * 1.11 (diffamp))
-  - id: kVoltageFineRatio  # output volts per ADC volt
-    type: float
-    initial_value: '0.0211'  # 1/1000th of the voltage ratio
   - id: kCurrentRatio0  # output amps per ADC volt, including accounting for resistor value
     type: float
     initial_value: '1.95'  # 1/(0.1 (resistor) * 5.12 (diffamp))
@@ -205,7 +202,7 @@ script:
 
         // then use the fine control to set the remainder
         id(dac_ratio_voltage_fine).make_call().set_value(
-            targetDac - id(dac_voltage).rawValue / 4095.0
+            (targetDac - id(dac_voltage).rawValue / 4095.0) * id(kCalSetVoltageFineFactor).state - 0.5
         ).perform();
 
 output:

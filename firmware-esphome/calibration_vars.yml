@@ -39,13 +39,13 @@ number:
       - then:
         - lambda: id(kCalSetVoltageFactor).publish_state(x);
   - platform: template
-    name: "${name} Cal Voltage Fine Set Factor"
+    name: "${name} Cal Voltage Fine Set Factor"  # in coarse DAC ratio steps to fine DAC ratio steps
     internal: true
     id: kCalSetVoltageFineFactor
     min_value: 0
-    max_value: 2
+    max_value: 10000
     step: 0.0001
-    initial_value: 1
+    initial_value: 0  # unused pre-calibration
     restore_value: true
     set_action:
       - then:
