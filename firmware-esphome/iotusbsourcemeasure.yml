@@ -140,17 +140,17 @@ script:
           ESP_LOGE("update_current", "Unknown range %s", id(current_range).current_option());
         }
 
-        id(dac_isink)->write_state(
-          0.5 - valueToAdc(id(limit_current_min).state, setCurrentFactor, 1.0, setCurrentOffset)
-        );
+        float dacIsnkRatio = 0.5 - valueToAdc(id(limit_current_min).state, setCurrentFactor, 1.0, setCurrentOffset);
+        id(dac_isink)->write_state(dacIsnkRatio);
+        id(dac_ratio_isink)->publish_state(dacIsnkRatio);
         id(dac_value_isink)->publish_state(id(dac_isink).rawValue);
         id(actual_limit_current_min)->publish_state(
           adcToValue(0.5 - id(dac_isink).rawValue / 4095.0, setCurrentFactor, 1.0, setCurrentOffset)
         );
 
-        id(dac_isrc)->write_state(
-          0.5 - valueToAdc(id(limit_current_max).state, setCurrentFactor, 1.0, setCurrentOffset)
-        );
+        float dacIsrcRatio = 0.5 - valueToAdc(id(limit_current_max).state, setCurrentFactor, 1.0, setCurrentOffset);
+        id(dac_isrc)->write_state(dacIsrcRatio);
+        id(dac_ratio_isrc)->publish_state(dacIsrcRatio);
         id(dac_value_isrc)->publish_state(id(dac_isrc).rawValue);
         id(actual_limit_current_max)->publish_state(
           adcToValue(0.5 - id(dac_isrc).rawValue / 4095.0, setCurrentFactor, 1.0, setCurrentOffset)
@@ -201,9 +201,9 @@ script:
     then:
     - lambda: |-
         // set the coarse voltage first
-        id(dac_voltage)->write_state(
-          0.5 - valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state)
-        );
+        float dacVoltageRatio = 0.5 - valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state);
+        id(dac_voltage)->write_state(dacVoltageRatio);
+        id(dac_ratio_voltage)->publish_state(dacVoltageRatio);
         id(dac_value_voltage)->publish_state(id(dac_voltage).rawValue);
         // get the quantized voltage
         float coarse_voltage = adcToValue(
@@ -539,6 +539,7 @@ sensor:
     channel_neg: CH2  # pin 2 is vcenter
     filters:
       - lambda: |-
+          id(ratio_voltage).publish_state(x);
           id(adc_voltage).publish_state(id(meas_voltage).rawValue);
           return adcToValue(x, id(kVoltageRatio), id(kCalVoltageFactor).state, id(kCalVoltageOffset).state);
   - platform: mcp3561
@@ -562,6 +563,7 @@ sensor:
           } else if (id(range2)->state && !id(range0)->state && !id(range1)->state) {
             thisRange = 2;
           }
+          id(ratio_current).publish_state(x);
           id(adc_current).publish_state(id(meas_current).rawValue);
 
           if (lastRange != thisRange || thisRange < 0) {  // invalidate the measurement on a range change
@@ -630,6 +632,16 @@ sensor:
     unit_of_measurement: Ah
 
   - platform: template
+    name: "${name} Meas Ratio Voltage"
+    id: ratio_voltage
+    accuracy_decimals: 8
+    internal: true
+  - platform: template
+    name: "${name} Meas Ratio Current"
+    id: ratio_current
+    accuracy_decimals: 8
+    internal: true
+  - platform: template
     name: "${name} Meas ADC Voltage"
     id: adc_voltage
     accuracy_decimals: 0
@@ -640,6 +652,21 @@ sensor:
     accuracy_decimals: 0
     internal: true
 
+  - platform: template  # these are the raw DAC counts
+    name: "${name} Set Ratio Voltage"
+    id: dac_ratio_voltage
+    accuracy_decimals: 8
+    internal: true
+  - platform: template
+    name: "${name} Set Ratio Current Source Limit"
+    id: dac_ratio_isrc
+    accuracy_decimals: 8
+    internal: true
+  - platform: template
+    name: "${name} Set Ratio Current Sink Limit"
+    id: dac_ratio_isink
+    accuracy_decimals: 8
+    internal: true
   - platform: template  # these are the raw DAC counts
     name: "${name} DAC Voltage"
     id: dac_value_voltage
