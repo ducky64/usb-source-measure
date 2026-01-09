@@ -24,7 +24,7 @@ class SmuInterface:
   kNameMeasRatioVoltage = 'Meas Ratio Voltage'
   kNameMeasRatioCurrent = 'Meas Ratio Current'
   kNameSetRatioVoltage = 'Set Ratio Voltage'
-  kNameSetRatioVoltageFine = 'Set Ratio Voltage Fine'
+  kNameSetRatioVoltageFine = 'Set Ratio Voltage Fine'  # inout
   kNameSetRatioCurrentMin = 'Set Ratio Current Min'
   kNameSetRatioCurrentMax = 'Set Ratio Current Max'
 
@@ -83,9 +83,6 @@ class SmuInterface:
 
   def set_voltage(self, voltage: float) -> None:
     self._set('number', self.kNameSetVoltage, voltage)
-
-  def set_voltage_fine(self, voltage: float) -> None:
-    self._set('number', self.kNameActualSetVoltageFine, voltage)
 
   def set_current_limits(self, current_min: float, current_max: float) -> None:
     assert current_min < current_max
