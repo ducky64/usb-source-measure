@@ -209,11 +209,13 @@ number:
         - lambda: id(kCalSetCurrent2Offset).publish_state(x);
 
   # these are workarounds for hardware limitations that should get addressed in a future spin
+  # these all operate directly on ADC and DAC ratios and are pre-conversion to actual units
+  # and the associated calibrations
+  # the calibration offset are zero at zero and do not contribute a static offset
   # these calibrate out the voltage drop across the HV -> LV protection circuit
   # these are multiplied by difference between the ADC reading and DAC setting ratio
-  # and added to the ADC ratio, before conversion-to-amps (and its calibration)
   - platform: template
-    name: "${name} Cal Current Resistance Source
+    name: "${name} Cal Current Resistance Source"
     internal: true
     id: kCalCurrentResistanceSource
     min_value: -1
@@ -225,7 +227,7 @@ number:
       - then:
         - lambda: id(kCalCurrentResistanceSource).publish_state(x);
   - platform: template
-    name: "${name} Cal Current Resistance Sink
+    name: "${name} Cal Current Resistance Sink"
     internal: true
     id: kCalCurrentResistanceSink
     min_value: -1
@@ -236,11 +238,11 @@ number:
     set_action:
       - then:
         - lambda: id(kCalCurrentResistanceSink).publish_state(x);
+        
   # this calibrates out common-mode voltage bleed into the current measurement
   # this is multiplied by the voltage ADC ratio and added to the current ratio
-  # and similarly pre-conversion-to-amps calibration
   - platform: template
-    name: "${name} Cal Current Common
+    name: "${name} Cal Current Common"
     internal: true
     id: kCalCurrentCommon
     min_value: -1

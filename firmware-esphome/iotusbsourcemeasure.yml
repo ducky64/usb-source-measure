@@ -566,6 +566,10 @@ sensor:
           id(ratio_current).publish_state(x);
           id(adc_current).publish_state(id(meas_current).rawValue);
 
+          x = x + id(kCalCurrentResistanceSource).state * (x - id(dac_ratio_isrc).state) 
+            + id(kCalCurrentResistanceSink).state * (x - id(dac_ratio_isink).state)
+            + id(kCalCurrentCommon).state * (id(ratio_voltage).state - 0.5);
+
           if (lastRange != thisRange || thisRange < 0) {  // invalidate the measurement on a range change
             lastRange = thisRange;
             if (thisRange < 0 && !lastSampleValid) {  // send NaNs after an initial zero - the zero for integrators to not integrate over the dead time
