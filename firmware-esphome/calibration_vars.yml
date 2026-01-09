@@ -24,8 +24,10 @@ number:
     set_action:
       - then:
         - lambda: id(kCalVoltageOffset).publish_state(x);
+    # the set calibration values are applied to DAC ratios to match ADC ratios
+    # these are independent of (and re-use, during processing) the ADC physical units calibration
   - platform: template
-    name: "${name} Cal Voltage Set Factor"  # multiply by set volts to get true volts
+    name: "${name} Cal Voltage Set Factor"  # gain / slope correction applied to the DAC
     internal: true
     id: kCalSetVoltageFactor
     min_value: 0
@@ -36,18 +38,6 @@ number:
     set_action:
       - then:
         - lambda: id(kCalSetVoltageFactor).publish_state(x);
-  - platform: template
-    name: "${name} Cal Voltage Set Offset"  # add to set volts to get true volts
-    internal: true
-    id: kCalSetVoltageOffset
-    min_value: -1
-    max_value: 1
-    step: 0.0001
-    initial_value: 0
-    restore_value: true
-    set_action:
-      - then:
-        - lambda: id(kCalSetVoltageOffset).publish_state(x);
   - platform: template
     name: "${name} Cal Voltage Fine Set Factor"
     internal: true
@@ -60,6 +50,18 @@ number:
     set_action:
       - then:
         - lambda: id(kCalSetVoltageFineFactor).publish_state(x);
+  - platform: template
+    name: "${name} Cal Voltage Set Offset"  # offset applied to the DAC, zero at zero (DAC center)
+    internal: true
+    id: kCalSetVoltageOffset
+    min_value: -1
+    max_value: 1
+    step: 0.0001
+    initial_value: 0
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalSetVoltageOffset).publish_state(x);
 
   - platform: template
     name: "${name} Cal Current0 Meas Factor"  # multiply measured amps by this to get true amps
