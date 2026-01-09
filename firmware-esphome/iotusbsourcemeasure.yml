@@ -656,7 +656,7 @@ sensor:
     accuracy_decimals: 0
     internal: true
 
-  - platform: template  # these are the raw DAC counts
+  - platform: template
     name: "${name} Set Ratio Voltage"
     id: dac_ratio_voltage
     accuracy_decimals: 8
