@@ -88,6 +88,6 @@ if __name__ == "__main__":
         elif user_input.lower() == 'n':
             sys.exit()
 
-    smu.cal_set(smu.kNameCalVoltageSetFactor, factor)
-    smu.cal_set(smu.kNameCalVoltageSetOffset, offset)
-    smu.cal_set(smu.kNameCalVoltageFineSetFactor, factor_fine)
+    smu.cal_set(smu.kNameCalVoltageSetFactor, -factor)
+    smu.cal_set(smu.kNameCalVoltageFineSetFactor, -factor_fine)
+    smu.cal_set(smu.kNameCalVoltageSetOffset, -offset)
