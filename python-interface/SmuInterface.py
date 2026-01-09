@@ -143,16 +143,6 @@ class SmuInterface:
     self._set('number', self.kNameCalVoltageMeasFactor, factor)
     self._set('number', self.kNameCalVoltageMeasOffset, offset)
 
-  def cal_get_voltage_set(self) -> Tuple[decimal.Decimal, decimal.Decimal]:
-    """Returns the voltage set calibration, factor and offset terms"""
-    return (self._get('number', self.kNameCalVoltageSetFactor, read_value=True),
-            self._get('number', self.kNameCalVoltageSetOffset, read_value=True))
-
-  def cal_set_voltage_set(self, factor: float, offset: float) -> None:
-    """Sets the voltage set calibration, factor and offset terms"""
-    self._set('number', self.kNameCalVoltageSetFactor, factor)
-    self._set('number', self.kNameCalVoltageSetOffset, offset)
-
   def cal_get_current_meas(self, irange: int) -> Tuple[decimal.Decimal, decimal.Decimal]:
     return (self._get('number', self.kNameCalCurrentMeasFactor[irange], read_value=True),
             self._get('number', self.kNameCalCurrentMeasOffset[irange], read_value=True))

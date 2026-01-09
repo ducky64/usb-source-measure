@@ -54,8 +54,6 @@ if __name__ == "__main__":
 
   prev_factor, prev_offset = smu.cal_get_voltage_meas()
   print(f'Current voltage meas cal: {prev_factor} x + {prev_offset}')
-  prev_factor, prev_offset = smu.cal_get_voltage_set()
-  print(f'Current voltage set cal: {prev_factor} x + {prev_offset}')
 
   while True:
     print('Clear and re-run calibration? [y/n]: ', end='')
@@ -66,7 +64,6 @@ if __name__ == "__main__":
       sys.exit()
 
   smu.cal_set_voltage_meas(1, 0)
-  smu.cal_set_voltage_set(1, 0)
   time.sleep(kSetReadDelay)
 
   with open(kOutputFile, 'w', newline='') as csvfile:
@@ -120,10 +117,6 @@ if __name__ == "__main__":
     meas_cal_factor, meas_cal_offset = regress(
       [float(pt[0]) for pt in meas_voltage_cal_data], [float(pt[1]) for pt in meas_voltage_cal_data])
 
-    print("Voltage set calibration")
-    set_cal_factor, set_cal_offset = regress(
-      [float(pt[0]) for pt in set_voltage_cal_data], [float(pt[1]) for pt in set_voltage_cal_data])
-
   while True:
     print('Commit to device? [y/n]: ', end='')
     user_data = input()
@@ -133,5 +126,4 @@ if __name__ == "__main__":
       sys.exit()
 
   smu.cal_set_voltage_meas(meas_cal_factor, meas_cal_offset)
-  smu.cal_set_voltage_set(set_cal_factor, set_cal_offset)
   print("Wrote device calibration. Allow 5 seconds to commit to flash before power cycling.")
