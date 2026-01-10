@@ -136,6 +136,7 @@ script:
           rawTargetDacSrc = valueToAdc(id(limit_current_max).state, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
         } else {
           ESP_LOGE("update_current", "unknown range %s", id(current_range).current_option());
+          return;
         }
         
         // create compensated targets by applying on the raw targets (to avoid recursion)
@@ -589,7 +590,7 @@ sensor:
           } else if (thisRange == 2) {
             value = adcToValue(x, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
           } else {
-            ESP_LOGE("meas_voltage", "unknown range %i", thisRange);
+            ESP_LOGE("meas_current", "unknown range %i", thisRange);
           }
           lastSampleValid = true;
           return value;

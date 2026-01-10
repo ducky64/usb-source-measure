@@ -1,7 +1,7 @@
 import argparse
 import sys
 import time
-from typing import Tuple, List
+from typing import List
 
 import numpy as np
 
@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     prev_factor = smu.cal_get(smu.kNameCalCurrentSetFactor)
     prev_offset = smu.cal_get(smu.kNameCalCurrentSetOffset)
-    print(f'Current voltage set cal: {prev_factor}x, {prev_offset} offset')
+    print(f'Current current set cal: {prev_factor}x, {prev_offset} offset')
 
     while True:
         print('Clear and re-run calibration? [y/n]: ', end='')
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     where
     A is the setpoints with constant 1 for offset
     x is the coefficients (factor, offset)
-    b is the resulting voltages
+    b is the measurements to match
     """
     a = np.stack([[set_point, 1.0]
                   for set_point in set_data])

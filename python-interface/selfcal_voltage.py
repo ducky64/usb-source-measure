@@ -70,7 +70,7 @@ if __name__ == "__main__":
     where
     A is the setpoints with constant 1 for offset
     x is the coefficients (coarse factor, fine factor, offset)
-    b is the resulting voltages
+    b is the measurements to match
     """
     a = np.stack([list(set_voltages) + [1.0]
                   for set_voltages in set_data])

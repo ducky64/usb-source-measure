@@ -78,7 +78,7 @@ if __name__ == "__main__":
     where
     A is the setpoints with constant 1 for offset
     x is the calibration coefficients
-    b is the measured currents
+    b is the measurements to match
     """
     a = np.stack([list(row) + [1.0] for row in set_data])
     b = np.array(meas_data)

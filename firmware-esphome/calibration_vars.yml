@@ -136,7 +136,7 @@ number:
       - then:
         - lambda: id(kCalCurrent2Offset).publish_state(x);
 
-    # similar to volage set cal, the set calibration values are applied to DAC ratios to match ADC ratios
+    # similar to voltage set cal, the set calibration values are applied to DAC ratios to match ADC ratios
   - platform: template
     name: "${name} Cal Current Set Factor"
     internal: true
