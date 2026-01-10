@@ -8,8 +8,8 @@ import numpy as np
 from SmuInterface import SmuInterface
 
 
-kVoltage = 1.0
-kCurrentCalPoints = [0.1, 0.5, 1] # , 1.5, 2]
+kVoltage = 2.0
+kCurrentCalPoints = [0.1, 0.5, 1, 1.5, 2]
 
 kSetReadDelay = 0.3  # seconds
 
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     meas_data: List[float] = []  # ADC-measured 'ground-truth' ratios
 
     try:
-        smu.set_voltage(1.0)
+        smu.set_voltage(kVoltage)
         smu.enable(True, "3A")
         for set_current in kCurrentCalPoints:
             smu.set_current_limits(-0.1, set_current)

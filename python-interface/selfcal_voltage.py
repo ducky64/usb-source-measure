@@ -8,8 +8,8 @@ import numpy as np
 from SmuInterface import SmuInterface
 
 
-kLimitCurrentMax = 0.05
-kLimitCurrentMin = -0.05
+kLimitCurrentMax = 0.1
+kLimitCurrentMin = -0.1
 kVoltageCalPoints = [1, 2, 4, 8, 12, 16, 20]
 kVoltageCalFineRatios = [-0.4, -0.25, 0, 0.25, 0.4]
 # LV short cal option
