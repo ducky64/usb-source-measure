@@ -642,12 +642,12 @@ sensor:
     name: "${name} Meas Ratio Voltage"
     id: ratio_voltage
     accuracy_decimals: 8
-    # internal: true
+    internal: true
   - platform: template
     name: "${name} Meas Ratio Current"
     id: ratio_current
     accuracy_decimals: 8
-    # internal: true
+    internal: true
   - platform: template
     name: "${name} Meas ADC Voltage"
     id: adc_voltage
@@ -663,17 +663,17 @@ sensor:
     name: "${name} Set Ratio Voltage"
     id: dac_ratio_voltage
     accuracy_decimals: 8
-    # internal: true
+    internal: true
   - platform: template
     name: "${name} Set Ratio Current Max"
     id: dac_ratio_isrc
     accuracy_decimals: 8
-    # internal: true
+    internal: true
   - platform: template
     name: "${name} Set Ratio Current Min"
     id: dac_ratio_isink
     accuracy_decimals: 8
-    # internal: true
+    internal: true
   - platform: template  # these are the raw DAC counts
     name: "${name} DAC Voltage"
     id: dac_value_voltage
