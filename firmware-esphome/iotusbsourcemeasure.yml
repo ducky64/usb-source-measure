@@ -197,20 +197,14 @@ script:
         // note, the calibration factors are actually stored as 1/A, 1/B, and -C
 
         // calculate the high precision target DAC value
-        float targetDac = 0.5 - valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalVoltageFactor).state, id(kCalVoltageOffset).state);
+        float targetDac = -valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalVoltageFactor).state, id(kCalVoltageOffset).state);
         targetDac = targetDac + id(kCalSetVoltageOffset).state;  // offset is common across both DACs
 
         // set the coarse voltage first
-        id(dac_voltage)->write_state(targetDac * id(kCalSetVoltageFactor).state); // coarse cal is for coarse DAC only
-        float quantizedDacVoltageRatio = id(dac_voltage).rawValue / 4095.0;
+        id(dac_voltage)->write_state(targetDac * id(kCalSetVoltageFactor).state + 0.5); // coarse cal is for coarse DAC only
+        float quantizedDacVoltageRatio = id(dac_voltage).rawValue / 4095.0 - 0.5;
         id(dac_ratio_voltage)->publish_state(quantizedDacVoltageRatio);
         id(dac_value_voltage)->publish_state(id(dac_voltage).rawValue);
-
-        ESP_LOGI("voltage", "Target %.05f, coarse-raw %i, coarse-contrib %.05f, remain %.05f", 
-          targetDac,
-          id(dac_voltage).rawValue,
-          quantizedDacVoltageRatio / id(kCalSetVoltageFactor).state,
-          (targetDac - quantizedDacVoltageRatio / id(kCalSetVoltageFactor).state));
 
         // then use the fine control to set the remainder
         id(dac_ratio_voltage_fine).make_call().set_value(
