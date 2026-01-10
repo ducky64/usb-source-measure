@@ -42,12 +42,12 @@ if __name__ == "__main__":
     smu.cal_set(smu.kNameCalVoltageSetFactor, 1)
     smu.cal_set(smu.kNameCalVoltageFineSetFactor, 1)
     smu.cal_set(smu.kNameCalVoltageSetOffset, 0)
-    smu.set_current_limits(kLimitCurrentMin, kLimitCurrentMax)
 
-    set_voltage_data: List[Tuple[float, float]] = []  # quantized readback setpoints ratios
-    meas_voltage_data: List[float] = []  # ADC-measured 'ground-truth' ratios
+    set_data: List[Tuple[float, float]] = []  # quantized readback setpoints ratios
+    meas_data: List[float] = []  # ADC-measured 'ground-truth' ratios
 
     try:
+        smu.set_current_limits(kLimitCurrentMin, kLimitCurrentMax)
         smu.enable(True, "3A")
         for set_voltage in kVoltageCalPoints:
             smu.set_voltage(set_voltage)
@@ -57,10 +57,10 @@ if __name__ == "__main__":
                 time.sleep(kSetReadDelay)
                 set_voltage_readback = float(smu._get('sensor', smu.kNameSetRatioVoltage))
                 set_voltage_fine_readback = float(smu._get('number', smu.kNameSetRatioVoltageFine))
-                set_voltage_data.append((set_voltage_readback, set_voltage_fine_readback))
+                set_data.append((set_voltage_readback, set_voltage_fine_readback))
 
                 meas_voltage = float(smu._get('sensor', smu.kNameMeasRatioVoltage))
-                meas_voltage_data.append(meas_voltage)
+                meas_data.append(meas_voltage)
 
                 print(f"SP={set_voltage_readback} + {set_voltage_fine_readback}, MV={meas_voltage}")
     finally:
@@ -73,8 +73,8 @@ if __name__ == "__main__":
     b is the resulting voltages
     """
     a = np.stack([list(set_voltages) + [1.0]
-                  for set_voltages in set_voltage_data])
-    b = -np.array(meas_voltage_data)  # set data is inverted from measurement data
+                  for set_voltages in set_data])
+    b = -np.array(meas_data)  # set data is inverted from measurement data
     x, residuals, rank, s = np.linalg.lstsq(a, b, rcond=None)
     factor, factor_fine, offset = x
     factor = 1/factor

@@ -123,27 +123,37 @@ script:
   - id: update_current  # update the current, assuming the device is on, or will be turned on
     then:
     - lambda: |-
-        float setCurrentFactor = 1, setCurrentOffset = 0;
+        float rawTargetDacSink, rawTargetDacSrc;
+        // calculate the target adc ratios using the measurement calibration factors
         if (id(current_range).current_option() == "3A") {
-          setCurrentFactor = id(kCalSetCurrent0Factor).state * id(kCurrentRatio0);
-          setCurrentOffset = id(kCalSetCurrent0Offset).state;
+          rawTargetDacSink = valueToAdc(id(limit_current_min).state, id(kCurrentRatio0), id(kCalCurrent0Factor).state, id(kCalCurrent0Offset).state);
+          rawTargetDacSrc = valueToAdc(id(limit_current_max).state, id(kCurrentRatio0), id(kCalCurrent0Factor).state, id(kCalCurrent0Offset).state);
         } else if (id(current_range).current_option() == "300mA") {
-          setCurrentFactor = id(kCalSetCurrent1Factor).state * id(kCurrentRatio1);
-          setCurrentOffset = id(kCalSetCurrent1Offset).state;
+          rawTargetDacSink = valueToAdc(id(limit_current_min).state, id(kCurrentRatio1), id(kCalCurrent1Factor).state, id(kCalCurrent1Offset).state);
+          rawTargetDacSrc = valueToAdc(id(limit_current_max).state, id(kCurrentRatio1), id(kCalCurrent1Factor).state, id(kCalCurrent1Offset).state);
         } else if (id(current_range).current_option() == "30mA") {
-          setCurrentFactor = id(kCalSetCurrent2Factor).state * id(kCurrentRatio2);
-          setCurrentOffset = id(kCalSetCurrent2Offset).state;
+          rawTargetDacSink = valueToAdc(id(limit_current_min).state, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
+          rawTargetDacSrc = valueToAdc(id(limit_current_max).state, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
         } else {
-          ESP_LOGE("update_current", "Unknown range %s", id(current_range).current_option());
+          ESP_LOGE("update_current", "unknown range %s", id(current_range).current_option());
         }
+        
+        // create compensated targets by applying on the raw targets (to avoid recursion)
+        // at the current limit, the measured is the same as the target, so the compensation for self is 0
+        // ignore the common-mode compensation, since it'll be dynamic, and it's a small factor
+        float targetDacSink = rawTargetDacSink
+            - id(kCalCurrentSetSourceFactor).state * (rawTargetDacSink - rawTargetDacSrc);
+        float targetDacSrc = rawTargetDacSrc
+            - id(kCalCurrentSetSinkFactor).state * (rawTargetDacSrc - rawTargetDacSink);
 
-        id(dac_isink)->write_state(
-            0.5 - valueToAdc(id(limit_current_min).state, setCurrentFactor, 1.0, setCurrentOffset));
+        // convert to dac ratios, and apply dac calibrations
+        targetDacSink = (-targetDacSink + id(kCalSetCurrentOffset).state) * id(kCalSetCurrentFactor).state;
+        id(dac_isink)->write_state(targetDacSink + 0.5);
         id(dac_ratio_isink)->publish_state(id(dac_isink).rawValue / 4095.0 - 0.5);
         id(dac_value_isink)->publish_state(id(dac_isink).rawValue);
 
-        id(dac_isrc)->write_state(
-            0.5 - valueToAdc(id(limit_current_max).state, setCurrentFactor, 1.0, setCurrentOffset));
+        targetDacSrc = (-targetDacSrc + id(kCalSetCurrentOffset).state) * id(kCalSetCurrentFactor).state;
+        id(dac_isrc)->write_state(targetDacSrc + 0.5);
         id(dac_ratio_isrc)->publish_state(id(dac_isrc).rawValue / 4095.0 - 0.5);
         id(dac_value_isrc)->publish_state(id(dac_isrc).rawValue);
 
@@ -578,6 +588,8 @@ sensor:
             value = adcToValue(x, id(kCurrentRatio1), id(kCalCurrent1Factor).state, id(kCalCurrent1Offset).state);
           } else if (thisRange == 2) {
             value = adcToValue(x, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
+          } else {
+            ESP_LOGE("meas_voltage", "unknown range %i", thisRange);
           }
           lastSampleValid = true;
           return value;

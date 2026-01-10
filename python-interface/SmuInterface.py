@@ -36,8 +36,8 @@ class SmuInterface:
 
   kNameCalCurrentMeasFactor = ['Cal Current0 Meas Factor', 'Cal Current1 Meas Factor', 'Cal Current2 Meas Factor']
   kNameCalCurrentMeasOffset = ['Cal Current0 Meas Offset', 'Cal Current1 Meas Offset', 'Cal Current2 Meas Offset']
-  kNameCalCurrentSetFactor = ['Cal Current0 Set Factor', 'Cal Current1 Set Factor', 'Cal Current2 Set Factor']
-  kNameCalCurrentSetOffset = ['Cal Current0 Set Offset', 'Cal Current1 Set Offset', 'Cal Current2 Set Offset']
+  kNameCalCurrentSetFactor = 'Cal Current Set Factor'
+  kNameCalCurrentSetOffset = 'Cal Current Set Offset'
 
   kNameCalCurrentSetSourceFactor = "Cal Current Set Source Factor"
   kNameCalCurrentSetSinkFactor = "Cal Current Set Sink Factor"
@@ -46,7 +46,8 @@ class SmuInterface:
   kNameAllCal = [
     kNameCalVoltageMeasFactor, kNameCalVoltageMeasOffset,
     kNameCalVoltageSetFactor, kNameCalVoltageFineSetFactor, kNameCalVoltageSetOffset,
-  ] + kNameCalCurrentMeasFactor + kNameCalCurrentMeasOffset + kNameCalCurrentSetFactor + kNameCalCurrentSetOffset + [
+  ] + kNameCalCurrentMeasFactor + kNameCalCurrentMeasOffset + [
+    kNameCalCurrentSetFactor, kNameCalCurrentSetOffset,
     kNameCalCurrentSetSourceFactor, kNameCalCurrentSetSinkFactor, kNameCalCurrentCommonFactor
   ]
 
@@ -138,14 +139,6 @@ class SmuInterface:
   def cal_set_current_meas(self, irange: int, factor: float, offset: float) -> None:
     self._set('number', self.kNameCalCurrentMeasFactor[irange], factor)
     self._set('number', self.kNameCalCurrentMeasOffset[irange], offset)
-
-  def cal_get_current_set(self, irange: int) -> Tuple[decimal.Decimal, decimal.Decimal]:
-    return (self._get('number', self.kNameCalCurrentSetFactor[irange], read_value=True),
-            self._get('number', self.kNameCalCurrentSetOffset[irange], read_value=True))
-
-  def cal_set_current_set(self, irange: int, factor: float, offset: float) -> None:
-    self._set('number', self.kNameCalCurrentSetFactor[irange], factor)
-    self._set('number', self.kNameCalCurrentSetOffset[irange], offset)
 
   def cal_get_all(self) -> Dict[str, decimal.Decimal]:
     out_dict = {}
