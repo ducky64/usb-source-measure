@@ -48,7 +48,7 @@ void drawValue(display::Display& it, int x, int y, font::Font* font,
 
   char forcedChar = 0;  // if nonzero, all digits replaced with this
   if (isnan(value)) {
-    forcedChar = '-';
+    forcedChar = ' ';
   } else if (digitsOffset < 0) {  // if number exceeds length
     forcedChar = '+';
   }

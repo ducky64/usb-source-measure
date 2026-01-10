@@ -52,8 +52,8 @@ if __name__ == "__main__":
         elif user_input.lower() == 'n':
             sys.exit()
 
-    currents: List[float] = []
-    data: List[Tuple[float, float, float]] = []  # imin, imax, dv
+    set_data: List[Tuple[float, float, float]] = []  # imin, imax, dv
+    meas_data: List[float] = []
     try:
         smu.enable(True, "3A")
         for set_voltage, set_limit_source, set_limit_sink in kCalPoints:
@@ -65,10 +65,10 @@ if __name__ == "__main__":
             delta_current_min = adc_ratio_current - float(smu._get('sensor', smu.kNameSetRatioCurrentMin))
             delta_current_max = adc_ratio_current - float(smu._get('sensor', smu.kNameSetRatioCurrentMax))
             delta_voltage = float(smu._get('sensor', smu.kNameMeasRatioVoltage))
-            currents.append(-adc_ratio_current)
-            data.append((delta_current_min,
-                         delta_current_max,
-                         delta_voltage))
+            meas_data.append(-adc_ratio_current)
+            set_data.append((delta_current_min,
+                             delta_current_max,
+                             delta_voltage))
 
             print(f"Iadc={adc_ratio_current}, dImin={delta_current_min}, dImax={delta_current_max}, dV={delta_voltage}")
     finally:
@@ -78,10 +78,10 @@ if __name__ == "__main__":
     where
     A is the setpoints with constant 1 for offset
     x is the calibration coefficients
-    b is the measured currents
+    b is the measurements to match
     """
-    a = np.stack([list(row) + [1.0] for row in data])
-    b = np.array(currents)
+    a = np.stack([list(row) + [1.0] for row in set_data])
+    b = np.array(meas_data)
     x, residuals, rank, s = np.linalg.lstsq(a, b, rcond=None)
 
     sink_factor, source_factor, common_factor, offset = x

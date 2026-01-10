@@ -24,8 +24,10 @@ number:
     set_action:
       - then:
         - lambda: id(kCalVoltageOffset).publish_state(x);
+    # the set calibration values are applied to DAC ratios to match ADC ratios
+    # these are independent of (and re-use, during processing) the ADC physical units calibration
   - platform: template
-    name: "${name} Cal Voltage Set Factor"  # multiply by set volts to get true volts
+    name: "${name} Cal Voltage Set Factor"  # gain / slope correction applied to the DAC
     internal: true
     id: kCalSetVoltageFactor
     min_value: 0
@@ -37,7 +39,19 @@ number:
       - then:
         - lambda: id(kCalSetVoltageFactor).publish_state(x);
   - platform: template
-    name: "${name} Cal Voltage Set Offset"  # add to set volts to get true volts
+    name: "${name} Cal Voltage Fine Set Factor"  # in coarse DAC ratio steps to fine DAC ratio steps
+    internal: true
+    id: kCalSetVoltageFineFactor
+    min_value: 0
+    max_value: 10000
+    step: 0.0001
+    initial_value: 0  # unused pre-calibration
+    restore_value: true
+    set_action:
+      - then:
+        - lambda: id(kCalSetVoltageFineFactor).publish_state(x);
+  - platform: template
+    name: "${name} Cal Voltage Set Offset"  # offset applied to the DAC, zero at zero (DAC center)
     internal: true
     id: kCalSetVoltageOffset
     min_value: -1
@@ -48,18 +62,6 @@ number:
     set_action:
       - then:
         - lambda: id(kCalSetVoltageOffset).publish_state(x);
-  - platform: template
-    name: "${name} Cal Voltage Fine Set Factor"
-    internal: true
-    id: kCalSetVoltageFineFactor
-    min_value: 0
-    max_value: 2
-    step: 0.0001
-    initial_value: 1
-    restore_value: true
-    set_action:
-      - then:
-        - lambda: id(kCalSetVoltageFineFactor).publish_state(x);
 
   - platform: template
     name: "${name} Cal Current0 Meas Factor"  # multiply measured amps by this to get true amps
@@ -86,31 +88,6 @@ number:
       - then:
         - lambda: id(kCalCurrent0Offset).publish_state(x);
   - platform: template
-    name: "${name} Cal Current0 Set Factor"  # multiply by set amps to get true amps - note varies with voltage!
-    internal: true
-    id: kCalSetCurrent0Factor
-    min_value: 0
-    max_value: 2
-    step: 0.0001
-    initial_value: 1
-    restore_value: true
-    set_action:
-      - then:
-        - lambda: id(kCalSetCurrent0Factor).publish_state(x);
-  - platform: template
-    name: "${name} Cal Current0 Set Offset"  # add to set amps to get true amps
-    internal: true
-    id: kCalSetCurrent0Offset
-    min_value: -1
-    max_value: 1
-    step: 0.0001
-    initial_value: 0
-    restore_value: true
-    set_action:
-      - then:
-        - lambda: id(kCalSetCurrent0Offset).publish_state(x);
-
-  - platform: template
     name: "${name} Cal Current1 Meas Factor"
     internal: true
     id: kCalCurrent1Factor
@@ -135,31 +112,6 @@ number:
       - then:
         - lambda: id(kCalCurrent1Offset).publish_state(x);
   - platform: template
-    name: "${name} Cal Current1 Set Factor"
-    internal: true
-    id: kCalSetCurrent1Factor
-    min_value: 0
-    max_value: 2
-    step: 0.0001
-    initial_value: 1
-    restore_value: true
-    set_action:
-      - then:
-        - lambda: id(kCalSetCurrent1Factor).publish_state(x);
-  - platform: template
-    name: "${name} Cal Current1 Set Offset"
-    internal: true
-    id: kCalSetCurrent1Offset
-    min_value: -1
-    max_value: 1
-    step: 0.0001
-    initial_value: 0
-    restore_value: true
-    set_action:
-      - then:
-        - lambda: id(kCalSetCurrent1Offset).publish_state(x);
-
-  - platform: template
     name: "${name} Cal Current2 Meas Factor"
     internal: true
     id: kCalCurrent2Factor
@@ -183,10 +135,12 @@ number:
     set_action:
       - then:
         - lambda: id(kCalCurrent2Offset).publish_state(x);
+
+    # similar to voltage set cal, the set calibration values are applied to DAC ratios to match ADC ratios
   - platform: template
-    name: "${name} Cal Current2 Set Factor"
+    name: "${name} Cal Current Set Factor"
     internal: true
-    id: kCalSetCurrent2Factor
+    id: kCalSetCurrentFactor
     min_value: 0
     max_value: 2
     step: 0.0001
@@ -194,11 +148,11 @@ number:
     restore_value: true
     set_action:
       - then:
-        - lambda: id(kCalSetCurrent2Factor).publish_state(x);
+        - lambda: id(kCalSetCurrentFactor).publish_state(x);
   - platform: template
-    name: "${name} Cal Current2 Set Offset"
+    name: "${name} Cal Current Set Offset"
     internal: true
-    id: kCalSetCurrent2Offset
+    id: kCalSetCurrentOffset
     min_value: -1
     max_value: 1
     step: 0.0001
@@ -206,7 +160,7 @@ number:
     restore_value: true
     set_action:
       - then:
-        - lambda: id(kCalSetCurrent2Offset).publish_state(x);
+        - lambda: id(kCalSetCurrentOffset).publish_state(x);
 
   # these are workarounds for hardware limitations that should get addressed in a future spin
   # these all operate directly on ADC and DAC ratios and are pre-conversion to actual units

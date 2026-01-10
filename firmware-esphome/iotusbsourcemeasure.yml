@@ -83,9 +83,6 @@ globals:
   - id: kVoltageRatio  # output volts per ADC volt
     type: float
     initial_value: '21.1'  # 1/(0.0426 (divider) * 1.11 (diffamp))
-  - id: kVoltageFineRatio  # output volts per ADC volt
-    type: float
-    initial_value: '0.0211'  # 1/1000th of the voltage ratio
   - id: kCurrentRatio0  # output amps per ADC volt, including accounting for resistor value
     type: float
     initial_value: '1.95'  # 1/(0.1 (resistor) * 5.12 (diffamp))
@@ -126,35 +123,40 @@ script:
   - id: update_current  # update the current, assuming the device is on, or will be turned on
     then:
     - lambda: |-
-        float setCurrentFactor = 1, setCurrentOffset = 0;
+        float rawTargetDacSink, rawTargetDacSrc;
+        // calculate the target adc ratios using the measurement calibration factors
         if (id(current_range).current_option() == "3A") {
-          setCurrentFactor = id(kCalSetCurrent0Factor).state * id(kCurrentRatio0);
-          setCurrentOffset = id(kCalSetCurrent0Offset).state;
+          rawTargetDacSink = valueToAdc(id(limit_current_min).state, id(kCurrentRatio0), id(kCalCurrent0Factor).state, id(kCalCurrent0Offset).state);
+          rawTargetDacSrc = valueToAdc(id(limit_current_max).state, id(kCurrentRatio0), id(kCalCurrent0Factor).state, id(kCalCurrent0Offset).state);
         } else if (id(current_range).current_option() == "300mA") {
-          setCurrentFactor = id(kCalSetCurrent1Factor).state * id(kCurrentRatio1);
-          setCurrentOffset = id(kCalSetCurrent1Offset).state;
+          rawTargetDacSink = valueToAdc(id(limit_current_min).state, id(kCurrentRatio1), id(kCalCurrent1Factor).state, id(kCalCurrent1Offset).state);
+          rawTargetDacSrc = valueToAdc(id(limit_current_max).state, id(kCurrentRatio1), id(kCalCurrent1Factor).state, id(kCalCurrent1Offset).state);
         } else if (id(current_range).current_option() == "30mA") {
-          setCurrentFactor = id(kCalSetCurrent2Factor).state * id(kCurrentRatio2);
-          setCurrentOffset = id(kCalSetCurrent2Offset).state;
+          rawTargetDacSink = valueToAdc(id(limit_current_min).state, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
+          rawTargetDacSrc = valueToAdc(id(limit_current_max).state, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
         } else {
-          ESP_LOGE("update_current", "Unknown range %s", id(current_range).current_option());
+          ESP_LOGE("update_current", "unknown range %s", id(current_range).current_option());
+          return;
         }
+        
+        // create compensated targets by applying on the raw targets (to avoid recursion)
+        // at the current limit, the measured is the same as the target, so the compensation for self is 0
+        // ignore the common-mode compensation, since it'll be dynamic, and it's a small factor
+        float targetDacSink = rawTargetDacSink
+            - id(kCalCurrentSetSourceFactor).state * (rawTargetDacSink - rawTargetDacSrc);
+        float targetDacSrc = rawTargetDacSrc
+            - id(kCalCurrentSetSinkFactor).state * (rawTargetDacSrc - rawTargetDacSink);
 
-        float dacIsnkRatio = 0.5 - valueToAdc(id(limit_current_min).state, setCurrentFactor, 1.0, setCurrentOffset);
-        id(dac_isink)->write_state(dacIsnkRatio);
-        id(dac_ratio_isink)->publish_state(dacIsnkRatio);
+        // convert to dac ratios, and apply dac calibrations
+        targetDacSink = (-targetDacSink + id(kCalSetCurrentOffset).state) * id(kCalSetCurrentFactor).state;
+        id(dac_isink)->write_state(targetDacSink + 0.5);
+        id(dac_ratio_isink)->publish_state(id(dac_isink).rawValue / 4095.0 - 0.5);
         id(dac_value_isink)->publish_state(id(dac_isink).rawValue);
-        id(actual_limit_current_min)->publish_state(
-          adcToValue(0.5 - id(dac_isink).rawValue / 4095.0, setCurrentFactor, 1.0, setCurrentOffset)
-        );
 
-        float dacIsrcRatio = 0.5 - valueToAdc(id(limit_current_max).state, setCurrentFactor, 1.0, setCurrentOffset);
-        id(dac_isrc)->write_state(dacIsrcRatio);
-        id(dac_ratio_isrc)->publish_state(dacIsrcRatio);
+        targetDacSrc = (-targetDacSrc + id(kCalSetCurrentOffset).state) * id(kCalSetCurrentFactor).state;
+        id(dac_isrc)->write_state(targetDacSrc + 0.5);
+        id(dac_ratio_isrc)->publish_state(id(dac_isrc).rawValue / 4095.0 - 0.5);
         id(dac_value_isrc)->publish_state(id(dac_isrc).rawValue);
-        id(actual_limit_current_max)->publish_state(
-          adcToValue(0.5 - id(dac_isrc).rawValue / 4095.0, setCurrentFactor, 1.0, setCurrentOffset)
-        );
 
   - id: set_enable_range  # sets the overall enable and current ranging IOs, based on the ranging and enable target
     parameters:
@@ -200,19 +202,25 @@ script:
   - id: update_voltage  # update the voltage
     then:
     - lambda: |-
+        // note, calibration solves for A*dac_coarse + B*dac_fine + C = adc
+        // ignoring fine, dac_coarse = (1/A)*(adc - C)
+        // with coarse set, dac_fine = (1/B)*(adc - C - A*dac_coarse)
+        // note, the calibration factors are actually stored as 1/A, 1/B, and -C
+
+        // calculate the high precision target DAC value
+        float targetDac = -valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalVoltageFactor).state, id(kCalVoltageOffset).state);
+        targetDac = targetDac + id(kCalSetVoltageOffset).state;  // offset is common across both DACs
+
         // set the coarse voltage first
-        float dacVoltageRatio = 0.5 - valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state);
-        id(dac_voltage)->write_state(dacVoltageRatio);
-        id(dac_ratio_voltage)->publish_state(dacVoltageRatio);
+        id(dac_voltage)->write_state(targetDac * id(kCalSetVoltageFactor).state + 0.5); // coarse cal is for coarse DAC only
+        float quantizedDacVoltageRatio = id(dac_voltage).rawValue / 4095.0 - 0.5;
+        id(dac_ratio_voltage)->publish_state(quantizedDacVoltageRatio);
         id(dac_value_voltage)->publish_state(id(dac_voltage).rawValue);
-        // get the quantized voltage
-        float coarse_voltage = adcToValue(
-            0.5 - id(dac_voltage).rawValue / 4095.0, 
-            id(kVoltageRatio), id(kCalSetVoltageFactor).state, id(kCalSetVoltageOffset).state);
-        id(actual_set_voltage)->publish_state(coarse_voltage);
 
         // then use the fine control to set the remainder
-        id(actual_set_voltage_fine).make_call().set_value(id(set_voltage).state - coarse_voltage).perform();
+        id(dac_ratio_voltage_fine).make_call().set_value(
+            (targetDac - quantizedDacVoltageRatio / id(kCalSetVoltageFactor).state) * id(kCalSetVoltageFineFactor).state
+        ).perform();
 
 output:
   - platform: mcpwm_sync
@@ -435,24 +443,18 @@ number:
             ESP_LOGD("BuckBoostCtl", "Target %.02f, buck %.02f, boost %.02f", x, buckDc, boostDc);
             id(buckboost_ratio).publish_state(x);
 
-  - platform: template  # unlike the other actuals, this is inout to allow calibration to actuate independently
-    name: "${name} Set Voltage Fine Actual"
-    id: actual_set_voltage_fine
-    min_value: -0.1
-    max_value: 0.1
+  - platform: template  # unlike the other ratios, this is inout to allow calibration to actuate independently
+    name: "${name} Set Ratio Voltage Fine"
+    id: dac_ratio_voltage_fine
+    min_value: -0.5
+    max_value: 0.5
     step: 0.0001
     set_action:
       - then:
         - lambda: |-
-            id(dac_voltage_fine)->write_state(
-                0.5 - valueToAdc(x, id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, 0)
-            );
-
+            id(dac_voltage_fine)->write_state(x + 0.5);
             // then write back out the quantized value
-            id(actual_set_voltage_fine).publish_state(
-              adcToValue(0.5 - id(dac_voltage_fine).rawValue / 4095.0, 
-                id(kVoltageFineRatio), id(kCalSetVoltageFineFactor).state, 0)
-            );
+            id(dac_ratio_voltage_fine).publish_state(id(dac_voltage_fine).rawValue / 4095.0 - 0.5);
 
 select:
   - platform: template  # published state is the target range, current range is the state of the ranging GPIOs
@@ -587,6 +589,8 @@ sensor:
             value = adcToValue(x, id(kCurrentRatio1), id(kCalCurrent1Factor).state, id(kCalCurrent1Offset).state);
           } else if (thisRange == 2) {
             value = adcToValue(x, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
+          } else {
+            ESP_LOGE("meas_current", "unknown range %i", thisRange);
           }
           lastSampleValid = true;
           return value;
@@ -635,7 +639,7 @@ sensor:
     accuracy_decimals: 6
     unit_of_measurement: Ah
 
-  - platform: template
+  - platform: template  # pre-calibration, range [-0.5, 0.5]
     name: "${name} Meas Ratio Voltage"
     id: ratio_voltage
     accuracy_decimals: 8
@@ -656,7 +660,7 @@ sensor:
     accuracy_decimals: 0
     internal: true
 
-  - platform: template
+  - platform: template  # post-quantization, pre-calibration, range [-0.5, 0.5]
     name: "${name} Set Ratio Voltage"
     id: dac_ratio_voltage
     accuracy_decimals: 8
@@ -690,22 +694,6 @@ sensor:
     name: "${name} DAC Current Sink Limit"
     id: dac_value_isink
     accuracy_decimals: 0
-    internal: true
-
-  - platform: template  # these are the setpoint values after quantization and calibration
-    name: "${name} Set Voltage Actual"
-    id: actual_set_voltage
-    accuracy_decimals: 4
-    internal: true
-  - platform: template
-    name: "${name} Set Current Min Actual"
-    id: actual_limit_current_min
-    accuracy_decimals: 5
-    internal: true
-  - platform: template
-    name: "${name} Set Current Max Actual"
-    id: actual_limit_current_max
-    accuracy_decimals: 5
     internal: true
 
   - platform: pulse_counter

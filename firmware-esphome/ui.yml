@@ -199,7 +199,7 @@ display:
       it.printf(labelX, lineY, id(bdf4x6), "MEAS%s",
           millis() % 1000 >= 500 ? "." : " ");  // liveness indicator
       if (id(kCalVoltageFactor).state == 1 || id(kCalVoltageOffset).state == 0 || id(kCalSetVoltageFactor).state == 1 || id(kCalSetVoltageOffset).state == 0 ||
-          id(kCalCurrent0Factor).state == 1 || id(kCalCurrent0Offset).state == 0 || id(kCalSetCurrent0Factor).state == 1 || id(kCalSetCurrent0Offset).state == 0) {
+          id(kCalCurrent0Factor).state == 1 || id(kCalCurrent0Offset).state == 0 || id(kCalSetCurrentFactor).state == 1 || id(kCalSetCurrentOffset).state == 0) {
         // TODO currently ignores the current 1 range since it's not supported on most boards
         // default calibration means uncalibrated
         drawInverted(it, valueRightX - 5*4 + 1, lineY, id(bdf4x6), "UNCAL");
@@ -260,7 +260,7 @@ display:
       lineY = 0;
       it.printf(labelX, lineY, id(bdf4x6), "SET");
       if (id(enable).state) {
-        drawInverted(it, valueRightX - 9, lineY, id(bdf4x6), "ON");
+        drawInverted(it, valueRightX - 7, lineY, id(bdf4x6), "ON");
       } else {
         it.print(valueRightX - 11, lineY, id(bdf4x6), "OFF");
       }

@@ -10,24 +10,23 @@ class SmuInterface:
 
   kNameMeasVoltage = 'Meas Voltage'
   kNameMeasCurrent = 'Meas Current'
-  kNameMeasRatioVoltage = 'Meas Ratio Voltage'
-  kNameMeasRatioCurrent = 'Meas Ratio Current'
   kNameDerivPower = 'Deriv Power'
   kNameDerivEnergy = 'Deriv Energy'
 
   kNameSetVoltage = 'Set Voltage'
   kNameSetCurrentMin = 'Set Current Min'
   kNameSetCurrentMax = 'Set Current Max'
-  kNameActualSetVoltage = 'Set Voltage Actual'
-  kNameActualSetVoltageFine = 'Set Voltage Fine Actual'
-  kNameActualSetCurrentMin = 'Set Current Min Actual'
-  kNameActualSetCurrentMax = 'Set Current Max Actual'
-  kNameSetRatioVoltage = 'Set Ratio Voltage'
-  kNameSetRatioCurrentMin = 'Set Ratio Current Min'
-  kNameSetRatioCurrentMax = 'Set Ratio Current Max'
 
   kNameEnable = "Enable"
   kNameCurrentRange = "Set Current Range"
+
+  # these ratio-based values are purely internal APIs, primarily for calibration
+  kNameMeasRatioVoltage = 'Meas Ratio Voltage'
+  kNameMeasRatioCurrent = 'Meas Ratio Current'
+  kNameSetRatioVoltage = 'Set Ratio Voltage'
+  kNameSetRatioVoltageFine = 'Set Ratio Voltage Fine'  # inout
+  kNameSetRatioCurrentMin = 'Set Ratio Current Min'
+  kNameSetRatioCurrentMax = 'Set Ratio Current Max'
 
   kNameCalVoltageMeasFactor = 'Cal Voltage Meas Factor'
   kNameCalVoltageMeasOffset = 'Cal Voltage Meas Offset'
@@ -37,8 +36,8 @@ class SmuInterface:
 
   kNameCalCurrentMeasFactor = ['Cal Current0 Meas Factor', 'Cal Current1 Meas Factor', 'Cal Current2 Meas Factor']
   kNameCalCurrentMeasOffset = ['Cal Current0 Meas Offset', 'Cal Current1 Meas Offset', 'Cal Current2 Meas Offset']
-  kNameCalCurrentSetFactor = ['Cal Current0 Set Factor', 'Cal Current1 Set Factor', 'Cal Current2 Set Factor']
-  kNameCalCurrentSetOffset = ['Cal Current0 Set Offset', 'Cal Current1 Set Offset', 'Cal Current2 Set Offset']
+  kNameCalCurrentSetFactor = 'Cal Current Set Factor'
+  kNameCalCurrentSetOffset = 'Cal Current Set Offset'
 
   kNameCalCurrentSetSourceFactor = "Cal Current Set Source Factor"
   kNameCalCurrentSetSinkFactor = "Cal Current Set Sink Factor"
@@ -46,9 +45,9 @@ class SmuInterface:
 
   kNameAllCal = [
     kNameCalVoltageMeasFactor, kNameCalVoltageMeasOffset,
-    kNameCalVoltageSetFactor, kNameCalVoltageSetOffset,
-    kNameCalVoltageFineSetFactor,
-  ] + kNameCalCurrentMeasFactor + kNameCalCurrentMeasOffset + kNameCalCurrentSetFactor + kNameCalCurrentSetOffset + [
+    kNameCalVoltageSetFactor, kNameCalVoltageFineSetFactor, kNameCalVoltageSetOffset,
+  ] + kNameCalCurrentMeasFactor + kNameCalCurrentMeasOffset + [
+    kNameCalCurrentSetFactor, kNameCalCurrentSetOffset,
     kNameCalCurrentSetSourceFactor, kNameCalCurrentSetSinkFactor, kNameCalCurrentCommonFactor
   ]
 
@@ -85,9 +84,6 @@ class SmuInterface:
   def set_voltage(self, voltage: float) -> None:
     self._set('number', self.kNameSetVoltage, voltage)
 
-  def set_voltage_fine(self, voltage: float) -> None:
-    self._set('number', self.kNameActualSetVoltageFine, voltage)
-
   def set_current_limits(self, current_min: float, current_max: float) -> None:
     assert current_min < current_max
     self._set('number', self.kNameSetCurrentMin, current_min)
@@ -97,13 +93,6 @@ class SmuInterface:
     """Returns the measured voltage and current"""
     return (self._get('sensor', self.kNameMeasVoltage),
             self._get('sensor', self.kNameMeasCurrent))
-
-  def get_voltage_current_set(self) -> Tuple[decimal.Decimal, decimal.Decimal, decimal.Decimal, decimal.Decimal]:
-      """Returns the voltage (coarse, fine) and current (sink limit, source limit) as a DAC-quantized target value"""
-      return (self._get('sensor', self.kNameActualSetVoltage),
-              self._get('number', self.kNameActualSetVoltageFine),  # inout typed
-              self._get('sensor', self.kNameActualSetCurrentMin),
-              self._get('sensor', self.kNameActualSetCurrentMax))
 
   def get_deriv_power(self) -> decimal.Decimal:
     """Returns the derived power in watts"""
@@ -143,16 +132,6 @@ class SmuInterface:
     self._set('number', self.kNameCalVoltageMeasFactor, factor)
     self._set('number', self.kNameCalVoltageMeasOffset, offset)
 
-  def cal_get_voltage_set(self) -> Tuple[decimal.Decimal, decimal.Decimal]:
-    """Returns the voltage set calibration, factor and offset terms"""
-    return (self._get('number', self.kNameCalVoltageSetFactor, read_value=True),
-            self._get('number', self.kNameCalVoltageSetOffset, read_value=True))
-
-  def cal_set_voltage_set(self, factor: float, offset: float) -> None:
-    """Sets the voltage set calibration, factor and offset terms"""
-    self._set('number', self.kNameCalVoltageSetFactor, factor)
-    self._set('number', self.kNameCalVoltageSetOffset, offset)
-
   def cal_get_current_meas(self, irange: int) -> Tuple[decimal.Decimal, decimal.Decimal]:
     return (self._get('number', self.kNameCalCurrentMeasFactor[irange], read_value=True),
             self._get('number', self.kNameCalCurrentMeasOffset[irange], read_value=True))
@@ -160,14 +139,6 @@ class SmuInterface:
   def cal_set_current_meas(self, irange: int, factor: float, offset: float) -> None:
     self._set('number', self.kNameCalCurrentMeasFactor[irange], factor)
     self._set('number', self.kNameCalCurrentMeasOffset[irange], offset)
-
-  def cal_get_current_set(self, irange: int) -> Tuple[decimal.Decimal, decimal.Decimal]:
-    return (self._get('number', self.kNameCalCurrentSetFactor[irange], read_value=True),
-            self._get('number', self.kNameCalCurrentSetOffset[irange], read_value=True))
-
-  def cal_set_current_set(self, irange: int, factor: float, offset: float) -> None:
-    self._set('number', self.kNameCalCurrentSetFactor[irange], factor)
-    self._set('number', self.kNameCalCurrentSetOffset[irange], offset)
 
   def cal_get_all(self) -> Dict[str, decimal.Decimal]:
     out_dict = {}
