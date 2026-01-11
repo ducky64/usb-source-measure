@@ -158,7 +158,7 @@ class SmuInterface:
 
 
 class SmuSampleRecord(NamedTuple):
-  millis: int
+  millis: float
   source: str
   value: decimal.Decimal
 
@@ -173,7 +173,7 @@ class SmuSampleBuffer:
       resp = requests.get(f'http://{self._smu.addr}/samples')
       if resp.status_code != 200:
         raise Exception(f'Request failed: {resp.status_code}')
-      self._last_sample = int(resp.text)
+      self._last_sample = int(float(resp.text))
       return []
     else:
       resp = requests.get(f'http://{self._smu.addr}/samples?start={self._last_sample}')
@@ -184,9 +184,9 @@ class SmuSampleBuffer:
       for sample_line in lines[:-1]:
         sample_line_split = sample_line.split(',')
         samples.append(SmuSampleRecord(
-          millis=int(sample_line_split[0]),
+          millis=float(sample_line_split[0]),
           source=sample_line_split[1],
           value=decimal.Decimal(sample_line_split[2])
         ))
-      self._last_sample = int(lines[-1])
+      self._last_sample = int(float(lines[-1]))
       return samples

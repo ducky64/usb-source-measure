@@ -189,7 +189,7 @@ script:
           }
           id(control_enable).turn_on();
           id(gate_hi).turn_on();
-          id(gate_lo).turn_off();  // TODO apply deadzone, intelligent on/off
+          id(gate_lo).turn_on();  // TODO apply deadzone, intelligent on/off
         } else {  // turn off
           id(range0).turn_off();
           id(range1).turn_off();
