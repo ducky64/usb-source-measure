@@ -187,14 +187,18 @@ script:
             ESP_LOGE("set_enable_range", "Unknown range %s", id(current_range).current_option());
             return;
           }
-          id(control_enable).turn_on();
           id(gate_hi).turn_on();
           id(gate_lo).turn_on();  // TODO apply deadzone, intelligent on/off
+
+          delay(4);
+          // wait for output SSRs to turn on before turning on the controller
+          // otherwise it runs open-loop and saturates
+          id(control_enable).turn_on();
         } else {  // turn off
+          id(control_enable).turn_off();
           id(range0).turn_off();
           id(range1).turn_off();
           id(range2).turn_off();
-          id(control_enable).turn_off();
           id(gate_hi).turn_off();
           id(gate_lo).turn_off();
         }
@@ -289,7 +293,7 @@ switch:
   - platform: gpio
     id: control_enable
     internal: true
-    name: "${name} Integrator Control Enable"
+    name: "${name} Controller Enable"
     pin:
       pca9554: ioe_ctl
       number: 4
