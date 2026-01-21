@@ -38,6 +38,7 @@ esphome:
 
   on_loop:
     - script.execute: buckboost_control_loop
+    - script.execute: protection_loop
   includes:
     - smu_display.h
     - bits2value.h
@@ -120,6 +121,16 @@ script:
           id(buckboost_ratio).make_call().set_value(0).perform();
         }
       
+  - id: protection_loop
+    then:
+    - lambda: |-
+        if (id(temp_fets).state > 80 || id(meas_voltage).get_state() > 31 || id(meas_voltage).get_state() < -1) {
+          id(enable).publish_state(false);
+          id(range0).turn_off();  // just in case, explicitly turn off the SSRs
+          id(range1).turn_off();
+          id(range2).turn_off();
+        }
+
   - id: update_current  # update the current, assuming the device is on, or will be turned on
     then:
     - lambda: |-
@@ -213,6 +224,7 @@ script:
 
         // calculate the high precision target DAC value
         float targetDac = -valueToAdc(id(set_voltage).state, id(kVoltageRatio), id(kCalVoltageFactor).state, id(kCalVoltageOffset).state);
+        targetDac = targetDac - id(kCalVoltageSetFactor).state * (targetDac * 2);  // compensate with expected difference
         targetDac = targetDac + id(kCalSetVoltageOffset).state;  // offset is common across both DACs
 
         // set the coarse voltage first
