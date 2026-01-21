@@ -39,6 +39,7 @@ class SmuInterface:
   kNameCalCurrentSetFactor = 'Cal Current Set Factor'
   kNameCalCurrentSetOffset = 'Cal Current Set Offset'
 
+  kNameCalVoltageMeasSetFactor = "Cal Voltage Meas Set Factor"
   kNameCalCurrentSetSourceFactor = "Cal Current Set Source Factor"
   kNameCalCurrentSetSinkFactor = "Cal Current Set Sink Factor"
   kNameCalCurrentCommonFactor = "Cal Current Common Factor"

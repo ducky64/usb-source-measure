@@ -8,7 +8,8 @@ import numpy as np
 from SmuInterface import SmuInterface
 
 
-kCalPoints = [  # as voltage target, source limit, sink limit
+# these are run with the output on, into an open load
+kCurrentCalPoints = [  # as voltage target, source limit, sink limit
     (0, -0.1, 0.1),
     (0, -0.1, 0.5),
     (0, -0.1, 1),
@@ -42,10 +43,10 @@ if __name__ == "__main__":
     source_factor = smu.cal_get(smu.kNameCalCurrentSetSourceFactor)
     sink_factor = smu.cal_get(smu.kNameCalCurrentSetSinkFactor)
     common_factor = smu.cal_get(smu.kNameCalCurrentCommonFactor)
-    print(f'Current comp cal: {source_factor}x source + {sink_factor}x sink + {common_factor}x common-mode')
+    print(f'Current current comp cal: {source_factor}x source + {sink_factor}x sink + {common_factor}x common-mode')
 
     while True:
-        print('Clear and re-run calibration? [y/n]: ', end='')
+        print('Re-run calibration? [y/n]: ', end='')
         user_input = input()
         if user_input.lower() == 'y':
             break
@@ -56,7 +57,7 @@ if __name__ == "__main__":
     meas_data: List[float] = []
     try:
         smu.enable(True, "3A")
-        for set_voltage, set_limit_source, set_limit_sink in kCalPoints:
+        for set_voltage, set_limit_source, set_limit_sink in kCurrentCalPoints:
             smu.set_voltage(set_voltage)
             smu.set_current_limits(set_limit_source, set_limit_sink)
             time.sleep(kSetReadDelay)

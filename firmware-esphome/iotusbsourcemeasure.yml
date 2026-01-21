@@ -547,6 +547,9 @@ sensor:
       - lambda: |-
           id(ratio_voltage).publish_state(x);
           id(adc_voltage).publish_state(id(meas_voltage).rawValue);
+
+          x = x + id(kCalVoltageSetFactor).state * (x - id(dac_ratio_voltage).state);
+
           return adcToValue(x, id(kVoltageRatio), id(kCalVoltageFactor).state, id(kCalVoltageOffset).state);
   - platform: mcp3561
     id: meas_current
@@ -609,7 +612,7 @@ sensor:
       - source: meas_voltage
     filters:
       - max:
-          window_size: 5
+          window_size: 25
           send_every: 1
 
   - platform: combination
