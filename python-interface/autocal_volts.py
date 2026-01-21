@@ -19,12 +19,10 @@ kVoltageCalPoints = [  # as voltage, current min, current max
   (1.0, -0.1, 0.1),
   (2.0, -0.1, 0.1),
   (4.0, -0.1, 0.1),
-  (6.0, -0.1, 0.1),
-  (8.0, -0.1, 0.1),
+  # for Fluke 79, skip the lowest digit count voltages
   (10.0, -0.1, 0.1),
   (14.0, -0.1, 0.1),
   (18.0, -0.1, 0.1),
-  (1.0, -0.1, 0.1),
 
   # "Connect 50ohm",
   # (1.0, -0.1, 0.1),
