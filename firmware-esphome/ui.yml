@@ -105,6 +105,11 @@ light:
               }
             }
 
+            if (!id(error).state.empty()) {
+              it[0] = Color(255, 0, 0, 0);
+              it[2] = Color(255, 0, 0, 0);
+            }
+
             if (id(enable).state) {
               if (id(control_limit_source).state ||
                   (lastCurrentSourcePulses != currentSourcePulses && !lastCurrentLimitState)) {
@@ -230,20 +235,25 @@ display:
       } else {
         lastCurrentLimitState = false;
       }
+
       lastCurrentSourcePulses = currentSourcePulses;
       lastCurrentSinkPulses = currentSinkPulses;
       
       lineY = 20;
-      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 1, 6), lineY, 
-          id(bdf6x10), 1, 4 + currentExtraDigits, id(meas_current).get_state());
-      it.print(valueRightX - 3, lineY + smallOffY, 
-          id(bdf4x6), "A");
+      if (!id(error).state.empty()) {  // error drawn in where current / power goes
+        drawInverted(it, 0, lineY, id(bdf6x10), id(error).state.c_str());
+      } else {
+        drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 1, 6), lineY, 
+            id(bdf6x10), 1, 4 + currentExtraDigits, id(meas_current).get_state());
+        it.print(valueRightX - 3, lineY + smallOffY, 
+            id(bdf4x6), "A");
 
-      lineY = 35;
-      drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 2, 6), lineY, 
-          id(bdf6x10), 2, 4 + currentExtraDigits, id(deriv_power).get_state());
-      it.print(valueRightX - 3, lineY + smallOffY, 
-          id(bdf4x6), "W");
+        lineY = 35;
+        drawValue(it, valueRightX - 5 - drawValueWidth(id(bdf6x10), 2, 6), lineY, 
+            id(bdf6x10), 2, 4 + currentExtraDigits, id(deriv_power).get_state());
+        it.print(valueRightX - 3, lineY + smallOffY, 
+            id(bdf4x6), "W");
+      }
 
       lineY = 45;
       float scaledJoules;
@@ -350,6 +360,9 @@ binary_sensor:
         - lambda: |-
             if (id(cursor) == 4) {
               id(integrator_reset).press();
+            }
+            if (!id(error).state.empty()) {
+              id(error).publish_state("");
             }
   - platform: gpio
     name: "${name} Dir Up"

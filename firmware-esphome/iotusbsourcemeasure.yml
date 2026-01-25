@@ -33,8 +33,11 @@ esphome:
     - delay: 0.1s
     - switch.turn_off: conv_enable
 
-    - delay: 1.0s  # assume enough time for PD to negotiate
+    - delay: 0.5s  # assume enough time for PD to negotiate
     - switch.turn_on: vin_ramp
+    - delay: 0.1s
+    - script.execute: update_current  # set initial DAC values
+    - script.execute: update_voltage
 
   on_loop:
     - script.execute: buckboost_control_loop
@@ -124,7 +127,21 @@ script:
   - id: protection_loop
     then:
     - lambda: |-
-        if (id(temp_fets).state > 80 || id(meas_voltage).get_state() > 31 || id(meas_voltage).get_state() < -1) {
+        if (!id(error).state.empty()) {
+          // don't replace an existing error
+        } else if (!id(conv_en_sense).state) {
+          id(error)->publish_state("SW Fault");  // note, only clearable with device reset
+        } else if (id(temp_buckboost).state > 60) {
+          id(error)->publish_state("SW Overtemp");
+        } else if (id(temp_fets).state > 60) {
+          id(error)->publish_state("FET Overtemp");
+        } else if (id(meas_voltage).get_state() > 32) {
+          id(error)->publish_state("Overvolt");
+        } else if (id(meas_voltage).get_state() < -2) {
+          id(error)->publish_state("Undervolt");
+        }
+        if (!id(error).state.empty()) {
+          id(buckboost_ratio).make_call().set_value(0).perform();
           id(enable).publish_state(false);
           id(range0).turn_off();  // just in case, explicitly turn off the SSRs
           id(range1).turn_off();
@@ -137,12 +154,42 @@ script:
         float rawTargetDacSink, rawTargetDacSrc;
         // calculate the target adc ratios using the measurement calibration factors
         if (id(current_range).current_option() == "3A") {
+          if (id(limit_current_min).state < -3) {  // note partly redundant with control constraints
+            id(limit_current_min).publish_state(-3);
+          } else if (id(limit_current_min).state > -0.1) {  // minimum separation between low and high limits
+            id(limit_current_min).publish_state(-0.1);
+          }
+          if (id(limit_current_max).state > 3) {
+            id(limit_current_max).publish_state(3);
+          } else if (id(limit_current_max).state < 0.1) {
+            id(limit_current_max).publish_state(0.1);
+          }
           rawTargetDacSink = valueToAdc(id(limit_current_min).state, id(kCurrentRatio0), id(kCalCurrent0Factor).state, id(kCalCurrent0Offset).state);
           rawTargetDacSrc = valueToAdc(id(limit_current_max).state, id(kCurrentRatio0), id(kCalCurrent0Factor).state, id(kCalCurrent0Offset).state);
         } else if (id(current_range).current_option() == "300mA") {
+          if (id(limit_current_min).state < -0.3) {
+            id(limit_current_min).publish_state(-0.3);
+          } else if (id(limit_current_min).state > -0.01) {
+            id(limit_current_min).publish_state(-0.01);
+          }
+          if (id(limit_current_max).state > 0.3) {
+            id(limit_current_max).publish_state(0.3);
+          } else if (id(limit_current_max).state < 0.01) {
+            id(limit_current_max).publish_state(0.01);
+          }
           rawTargetDacSink = valueToAdc(id(limit_current_min).state, id(kCurrentRatio1), id(kCalCurrent1Factor).state, id(kCalCurrent1Offset).state);
           rawTargetDacSrc = valueToAdc(id(limit_current_max).state, id(kCurrentRatio1), id(kCalCurrent1Factor).state, id(kCalCurrent1Offset).state);
         } else if (id(current_range).current_option() == "30mA") {
+          if (id(limit_current_min).state < -0.03) {
+            id(limit_current_min).publish_state(-0.03);
+          } else if (id(limit_current_min).state > -0.001) {
+            id(limit_current_min).publish_state(-0.001);
+          }
+          if (id(limit_current_max).state > 0.03) {
+            id(limit_current_max).publish_state(0.03);
+          } else if (id(limit_current_max).state < 0.001) {
+            id(limit_current_max).publish_state(0.001);
+          }
           rawTargetDacSink = valueToAdc(id(limit_current_min).state, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
           rawTargetDacSrc = valueToAdc(id(limit_current_max).state, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
         } else {
@@ -160,11 +207,19 @@ script:
 
         // convert to dac ratios, and apply dac calibrations
         targetDacSink = (-targetDacSink + id(kCalSetCurrentOffset).state) * id(kCalSetCurrentFactor).state;
+        targetDacSrc = (-targetDacSrc + id(kCalSetCurrentOffset).state) * id(kCalSetCurrentFactor).state;
+
+        if (abs(targetDacSrc - targetDacSink) < 16.0/4096) {  // arbitrary, accounts for INL and some buffer
+          ESP_LOGE("update_current", "insufficient separation between current limits DAC values %f, %f",
+            targetDacSrc, targetDacSink);
+          id(error)->publish_state("DAC Sep");
+          return;
+        }
+
         id(dac_isink)->write_state(targetDacSink + 0.5);
         id(dac_ratio_isink)->publish_state(id(dac_isink).rawValue / 4095.0 - 0.5);
         id(dac_value_isink)->publish_state(id(dac_isink).rawValue);
 
-        targetDacSrc = (-targetDacSrc + id(kCalSetCurrentOffset).state) * id(kCalSetCurrentFactor).state;
         id(dac_isrc)->write_state(targetDacSrc + 0.5);
         id(dac_ratio_isrc)->publish_state(id(dac_isrc).rawValue / 4095.0 - 0.5);
         id(dac_value_isrc)->publish_state(id(dac_isrc).rawValue);
@@ -390,6 +445,11 @@ mcp3561:
 mcp4728:
   id: dac_control
 
+text_sensor:
+  - platform: template
+    name: "Error"
+    id: error  # is empty when there is no fault condition
+
 number:
   - platform: template
     name: "${name} Set Voltage"
@@ -411,7 +471,7 @@ number:
     icon: mdi:pan-up
     mode: box
     min_value: -3
-    max_value: -0.01
+    max_value: 0
     step: 0.001
     unit_of_measurement: A
     set_action:
@@ -423,7 +483,7 @@ number:
     id: limit_current_max
     icon: mdi:pan-down
     mode: box
-    min_value: 0.01
+    min_value: 0
     max_value: 3
     step: 0.001
     unit_of_measurement: A
