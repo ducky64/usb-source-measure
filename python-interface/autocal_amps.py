@@ -24,8 +24,7 @@ kCalPoints = [  # by irange; as voltage, current min, current max
   ],
   [  # range 1 (300mA)
     "Connect 50-ohm load",
-    (3, -0.2, 0.02),
-    (3, -0.2, 0.04),
+    # for Fluke 79, skip the lowest digit count voltages
     (6, -0.2, 0.1),
     (8.5, -0.2, 0.15),
     (11, -0.2, 0.2),
