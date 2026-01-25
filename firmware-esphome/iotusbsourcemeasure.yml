@@ -212,6 +212,7 @@ script:
         if (abs(targetDacSrc - targetDacSink) < 16.0/4096) {  // arbitrary, accounts for INL and some buffer
           ESP_LOGE("update_current", "insufficient separation between current limits DAC values %f, %f",
             targetDacSrc, targetDacSink);
+          id(error)->publish_state("DAC Sep");
           return;
         }
 
