@@ -47,7 +47,12 @@ if __name__ == "__main__":
     done = False
 
     while not done:
-      samples = samplebuf.get()
+      try:
+        samples = samplebuf.get()
+      except Exception as e:
+        print(e)
+        continue  # try again
+
       for sample in samples:
         if not samples_valid:
           if sample.source == 'A' and not sample.value.is_nan():
