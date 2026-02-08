@@ -18,7 +18,7 @@ esphome:
   on_boot:
     - number.set:
         id: set_voltage
-        value: 0
+        value: 0.0
     - number.set:
         id: limit_current_min
         value: -0.1
@@ -130,9 +130,9 @@ script:
         if (!id(error).state.empty()) {
           // don't replace an existing error
         } else if (!id(conv_en_sense).state) {
-          id(error)->publish_state("SW Fault");  // note, only clearable with device reset
+          id(error)->publish_state("Buckboost Fault");  // note, only clearable with device reset
         } else if (id(temp_buckboost).state > 60) {
-          id(error)->publish_state("SW Overtemp");
+          id(error)->publish_state("Buckboost Overtemp");
         } else if (id(temp_fets).state > 60) {
           id(error)->publish_state("FET Overtemp");
         } else if (id(meas_voltage).get_state() > 32) {
@@ -141,6 +141,7 @@ script:
           id(error)->publish_state("Undervolt");
         }
         if (!id(error).state.empty()) {
+          ESP_LOGE("protection_loop", "shutdown from error %s", id(error).state.empty());
           id(buckboost_ratio).make_call().set_value(0).perform();
           id(enable).publish_state(false);
           id(range0).turn_off();  // just in case, explicitly turn off the SSRs
