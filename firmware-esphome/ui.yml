@@ -99,10 +99,10 @@ light:
             if (!id(conv_en_sense).state) {  // OVP trip makes input LED go red
               it[5] = Color(255, 0, 0, 0);
             } else {  // otherwuse USB-PD state
-              switch (id(usbpd).get_state()) {
-                case UsbPdStateMachine::kConnected: it[5] = Color(0, 255, 0, 0); break;
-                default: it[5] = Color(255, 255, 0, 0);
-              }
+              //switch (id(usbpd).get_state()) {
+              //  case UsbPdStateMachine::kConnected: it[5] = Color(0, 255, 0, 0); break;
+              //  default: it[5] = Color(255, 255, 0, 0);
+              //}
             }
 
             if (!id(error).state.empty()) {
@@ -318,12 +318,7 @@ display:
       it.printf(0, 64, id(bdf4x6), TextAlign::BOTTOM_LEFT, "%s %s",
           wifiSsidTrunc, id(wifi_ip).state.c_str());
 
-      const char* pdState;
-      switch (id(usbpd).get_state()) {
-        case UsbPdStateMachine::kConnected: pdState = "PD"; break;
-        default: pdState = "  ";
-      }
-      it.printf(128, 64-6, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%s %2.0fv %2.f,%2.fc", pdState, id(fusb_vbus).get_state(), id(temp_buckboost).state, id(temp_fets).state);
+      it.printf(128, 64-6, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "%2.f,%2.fc", id(temp_buckboost).state, id(temp_fets).state);
       
       it.printf(128, 64, id(bdf4x6), TextAlign::BOTTOM_RIGHT, "Ducky SMU");
 

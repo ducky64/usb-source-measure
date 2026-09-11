@@ -7,6 +7,13 @@ packages:
   - !include instrumentation.yml
   - !include characterization.yml
 
+external_components:
+  - source:
+      type: git
+      url: https://github.com/rbaron/esphome
+      ref: df3f411504841f7e3cf698bd63734c3a656504c6  # fusb302 branch, pinned at 2026-07-12
+    components: [fusb302]
+
 esp32:
   board: esp32-s3-devkitc-1  # 8MB flash without PSRAM
   framework:
@@ -30,12 +37,16 @@ esphome:
         value: 0.0
 
     - switch.turn_on: conv_enable  # pulse conv enable latch
-    - delay: 0.1s
+    - delay: 100ms
     - switch.turn_off: conv_enable
 
-    - delay: 0.5s  # assume enough time for PD to negotiate
+    - delay: 500ms  # required otherwise it boot loops, possibly inrush related
+    - fusb302.start_power_negotiation:
+        id: fusb302_id
+
+    - delay: 500ms  # assume enough time for PD to negotiate
     - switch.turn_on: vin_ramp
-    - delay: 0.1s
+    - delay: 100ms
     - script.execute: update_current  # set initial DAC values
     - script.execute: update_voltage
 
@@ -109,7 +120,7 @@ script:
         auto deltaMillis = min(thisRun - lastRun, (unsigned long)kMaxDeltaMillis);
         if (id(enable).state) {  // only write the buck-boost if target is enable
           // set buck-boost to minimum needed + headroom
-          float voltageScalingFactor = max(5.0, (id(fusb_vbus).state - 0.4));  // ratio to output volts = Vin, always expect at least 5
+          float voltageScalingFactor = max(5.0, 15.0);  // ratio to output volts = Vin, always expect at least 5
           // must be higher than measured output to avoid the output back-driving Vconv through the FET body diode; should be hardware diode-gated in a future rev
           float convTargetVolts = max(id(set_voltage).state, id(meas_voltage_max).state) + id(kBuckBoostHeadroom);
           float currentConvVolts = id(buckboost_ratio).state * voltageScalingFactor;
@@ -435,8 +446,18 @@ pca9554:
     address: 0x3A
 
 fusb302:
-  id: usbpd
-  target: 15v
+  id: fusb302_id
+  # interrupt_pin: GPIO8
+  voltage: 15000 V
+  current: 3 A
+  start_power_negotiation_on_boot: false
+  on_pd_negotiation_success:
+    - lambda: |-
+        ESP_LOGW("fusb302_trigger", "PD negotiation success outcome: %d", success);
+  on_pd_negotiation_failure:
+    then:
+      - lambda: |-
+          ESP_LOGW("fusb302_trigger", "PD negotiation failure outcome: %d", success);
 
 mcp3561:
   cs_pin: GPIO3
@@ -593,20 +614,6 @@ binary_sensor:
         pullup: true
 
 sensor:
-  - platform: fusb302
-    vbus:
-      id: fusb_vbus
-      name: "${name} PD VBus"
-      filters:  # limit to 1 update/s or on fast change
-        - or:
-          - throttle : 1s
-          - delta: 1.0
-    selected_voltage:
-      id: fusb_selected_voltage
-      name: "${name} PD Selected Voltage"
-    selected_current:
-      id: fusb_selected_current
-      name: "${name} PD Selected Current"
   - platform: mcp3561
     id: meas_voltage
     name: "${name} Meas Voltage"
