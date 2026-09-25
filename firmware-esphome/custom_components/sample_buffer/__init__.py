@@ -42,9 +42,5 @@ async def to_code(config):
 
     for source_conf in config[CONF_SOURCES]:
         source = await cg.get_variable(source_conf[CONF_SOURCE])
-        name = await cg.templatable(
-            source_conf[CONF_NAME],
-            [(str, "x")],
-            cg.float_,
-        )
+        name = source_conf[CONF_NAME]
         cg.add(var.add_source(source, name))

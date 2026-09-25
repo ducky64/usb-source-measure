@@ -11,8 +11,11 @@ external_components:
   - source:
       type: git
       url: https://github.com/rbaron/esphome
-      ref: df3f411504841f7e3cf698bd63734c3a656504c6  # fusb302 branch, pinned at 2026-07-12
+      ref: 666fb739dbad7e35bb944de86bb6cbebc1b6dcfd  # fusb302 branch, pinned at 2026-05-24
     components: [fusb302]
+  - source:
+      type: local
+      path: custom_components
 
 esp32:
   board: esp32-s3-devkitc-1  # 8MB flash without PSRAM
@@ -205,7 +208,7 @@ script:
           rawTargetDacSink = valueToAdc(id(limit_current_min).state, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
           rawTargetDacSrc = valueToAdc(id(limit_current_max).state, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
         } else {
-          ESP_LOGE("update_current", "unknown range %s", id(current_range).current_option());
+          ESP_LOGE("update_current", "unknown range %s", id(current_range).current_option().c_str());
           return;
         }
         
@@ -262,7 +265,7 @@ script:
               id(range1).turn_off();
             }
           } else {
-            ESP_LOGE("set_enable_range", "Unknown range %s", id(current_range).current_option());
+            ESP_LOGE("set_enable_range", "Unknown range %s", id(current_range).current_option().c_str());
             return;
           }
           id(gate_hi).turn_on();
@@ -447,7 +450,7 @@ pca9554:
 
 fusb302:
   id: fusb302_id
-  # interrupt_pin: GPIO8
+  interrupt_pin: GPIO16
   voltage: 15000 V
   current: 3 A
   start_power_negotiation_on_boot: false
