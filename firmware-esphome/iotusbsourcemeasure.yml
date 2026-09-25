@@ -44,8 +44,8 @@ esphome:
     - switch.turn_off: conv_enable
 
     - delay: 500ms  # required otherwise it boot loops, possibly inrush related
-    - fusb302.start_power_negotiation:
-        id: fusb302_id
+    # - fusb302.start_power_negotiation:
+    #     id: fusb302_id
 
     - delay: 500ms  # assume enough time for PD to negotiate
     - switch.turn_on: vin_ramp
@@ -155,7 +155,7 @@ script:
           id(error)->publish_state("Undervolt");
         }
         if (!id(error).state.empty()) {
-          ESP_LOGE("protection_loop", "shutdown from error %s", id(error).state.empty());
+          ESP_LOGE("protection_loop", "shutdown from error %s", id(error).state.c_str());
           id(buckboost_ratio).make_call().set_value(0).perform();
           id(enable).publish_state(false);
           id(range0).turn_off();  // just in case, explicitly turn off the SSRs
@@ -450,7 +450,7 @@ pca9554:
 
 fusb302:
   id: fusb302_id
-  interrupt_pin: GPIO16
+  # interrupt_pin: GPIO16
   voltage: 15000 V
   current: 3 A
   start_power_negotiation_on_boot: false
