@@ -308,7 +308,7 @@ display:
       lineY = 45;
       it.printf(labelX, lineY, id(bdf4x6), "RANGE");
       drawInverted(it, valueRightX - 5*4 + 1, lineY, 
-          id(bdf4x6), id(current_range).current_option(),
+          id(bdf4x6), id(current_range).current_option().c_str(),
           id(cursor) == 3);
 
       // DEVICE INFO

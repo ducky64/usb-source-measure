@@ -7,6 +7,11 @@ packages:
   - !include instrumentation.yml
   - !include characterization.yml
 
+external_components:
+  - source:
+      type: local
+      path: custom_components
+
 esp32:
   board: esp32-s3-devkitc-1  # 8MB flash without PSRAM
   framework:
@@ -35,9 +40,12 @@ esphome:
 
     - delay: 0.5s  # assume enough time for PD to negotiate
     - switch.turn_on: vin_ramp
-    - delay: 0.1s
+    - delay: 0.1s  # wait for 5v rail to ramp
     - script.execute: update_current  # set initial DAC values
     - script.execute: update_voltage
+
+    - delay: 0.5s
+    - wifi.enable:  # don't turn on high power items until after negotiation
 
   on_loop:
     - script.execute: buckboost_control_loop
@@ -51,6 +59,7 @@ preferences:
 
 wifi:
   <<: !include ../wifi_config.yaml
+  enable_on_boot: false
   ap:
     ap_timeout: 15s
 
@@ -141,7 +150,7 @@ script:
           id(error)->publish_state("Undervolt");
         }
         if (!id(error).state.empty()) {
-          ESP_LOGE("protection_loop", "shutdown from error %s", id(error).state.empty());
+          ESP_LOGE("protection_loop", "shutdown from error %s", id(error).state.c_str());
           id(buckboost_ratio).make_call().set_value(0).perform();
           id(enable).publish_state(false);
           id(range0).turn_off();  // just in case, explicitly turn off the SSRs
@@ -194,7 +203,7 @@ script:
           rawTargetDacSink = valueToAdc(id(limit_current_min).state, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
           rawTargetDacSrc = valueToAdc(id(limit_current_max).state, id(kCurrentRatio2), id(kCalCurrent2Factor).state, id(kCalCurrent2Offset).state);
         } else {
-          ESP_LOGE("update_current", "unknown range %s", id(current_range).current_option());
+          ESP_LOGE("update_current", "unknown range %s", id(current_range).current_option().c_str());
           return;
         }
         
@@ -251,7 +260,7 @@ script:
               id(range1).turn_off();
             }
           } else {
-            ESP_LOGE("set_enable_range", "Unknown range %s", id(current_range).current_option());
+            ESP_LOGE("set_enable_range", "Unknown range %s", id(current_range).current_option().c_str());
             return;
           }
           id(gate_hi).turn_on();

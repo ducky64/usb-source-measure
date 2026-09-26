@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/sensor/filter.h"
 #include "esphome/core/component.h"
